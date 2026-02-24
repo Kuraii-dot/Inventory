@@ -1,0 +1,169 @@
+this is the folder structure that i have, all of this is stored inside the xampp-htdocs/InventorySys
+├─actions/
+│   ├─ add_distributions.php
+│   ├─ delete_category.php
+│   ├─ delete_distributions.php
+│   ├─ delete_items.php
+│   ├─ delete_supplier.php
+│   ├─ edit_category.php
+│   ├─ edit_item.php
+│   ├─ edit_supplier.php
+│   ├─ fetch_distributions.php
+│   └─ fetch_items.php
+│
+├─ font/
+│   ├─ css/
+│   │    ├─ app.css
+│   │    └─ output.css
+│   │
+│   └─js/
+│      ├─ category.js
+│      ├─ distribution.js
+│      ├─ items.js
+│      ├─ supplier.js
+│      └─ utils.js
+│
+├─includes/
+│   ├─ db.php
+│   ├─ footer.php
+│   ├─ header.php
+│   ├─ Logo.png
+│   ├─ report_excel.php
+│   └─ report_pdf.php
+│ 
+│
+├─ node_modules/
+│ 
+├─ pages/
+│   │
+│   ├─forms/
+│   │   ├─ add_category.php
+│   │   ├─ add_supplier.php
+│   │   ├─ category_form.php
+│   │   ├─ category_list.php
+│   │   ├─ edit_item.php
+│   │   ├─ fetch_categories.php
+│   │   ├─ fetch_distributions.php
+│   │   ├─ fetch_suppliers.php
+│   │   ├─ generate_report.php
+│   │   └─ supplier_form.php
+│   │
+│   ├─ allitems.php
+│   ├─ dashboard.php
+│   ├─ distributions.php
+│   ├─ item_form.php
+│   └─ items.php
+│ 
+├─ vendor/                  --> i din't write everything cause there's too many files on each of these folders
+│   ├─ composer/
+│   ├─ ezyang/
+│   ├─ maennchen/
+│   ├─ markbaker/
+│   ├─ myclabs/
+│   ├─ phpoffice/
+│   ├─ psr/
+│   └─ setaign/
+│ 
+├─ .gitignore
+├─ composer.json
+├─ composer.lock
+├─ folderstructure.txt
+├─ index.php
+├─ log.txt
+├─ package-lock.json
+├─ package.json
+├─ tailwind.config.js
+├─ test_db.php
+└─ test.php
+
+
+📦InventorySys
+ ┣ 📂actions
+ ┃ ┣ 📜add_allocation.php
+ ┃ ┣ 📜add_classification.php
+ ┃ ┣ 📜add_distributions.php
+ ┃ ┣ 📜allocate_item.php
+ ┃ ┣ 📜assign_classification.php
+ ┃ ┣ 📜delete_allocation.php
+ ┃ ┣ 📜delete_category.php
+ ┃ ┣ 📜delete_distributions.php
+ ┃ ┣ 📜delete_items.php
+ ┃ ┣ 📜delete_supplier.php
+ ┃ ┣ 📜edit_allocation.php
+ ┃ ┣ 📜edit_category.php
+ ┃ ┣ 📜edit_distribution.php
+ ┃ ┣ 📜edit_item.php
+ ┃ ┣ 📜edit_supplier.php
+ ┃ ┣ 📜fetch_distributions.php
+ ┃ ┣ 📜fetch_items.php
+ ┃ ┣ 📜get_classification.php
+ ┃ ┣ 📜return_allocation.php
+ ┃ ┣ 📜return_distribution.php
+ ┃ ┗ 📜validate_stock.php
+ ┣ 📂front
+ ┃ ┣ 📂css
+ ┃ ┃ ┣ 📜app.css
+ ┃ ┃ ┗ 📜output.css
+ ┃ ┗ 📂js
+ ┃ ┃ ┣ 📜allocation.js
+ ┃ ┃ ┣ 📜category.js
+ ┃ ┃ ┣ 📜classifications.js
+ ┃ ┃ ┣ 📜distribution.js
+ ┃ ┃ ┣ 📜items.js
+ ┃ ┃ ┣ 📜supplier.js
+ ┃ ┃ ┗ 📜utils.js
+ ┣ 📂includes
+ ┃ ┣ 📜auth.php
+ ┃ ┣ 📜BG.svg
+ ┃ ┣ 📜BG1.svg
+ ┃ ┣ 📜db.php
+ ┃ ┣ 📜footer.php
+ ┃ ┣ 📜header.php
+ ┃ ┣ 📜Inventory.png
+ ┃ ┣ 📜Logo.png
+ ┃ ┣ 📜report_excel.php
+ ┃ ┗ 📜report_pdf.php
+ ┣ 📂logs
+ ┣ 📂node_modules
+ ┣ 📂pages
+ ┃ ┣ 📂forms
+ ┃ ┃ ┣ 📜add_category.php
+ ┃ ┃ ┣ 📜add_supplier.php
+ ┃ ┃ ┣ 📜category_form.php
+ ┃ ┃ ┣ 📜category_list.php
+ ┃ ┃ ┣ 📜department_report.php
+ ┃ ┃ ┣ 📜edit_item.php
+ ┃ ┃ ┣ 📜fetch_allocations.php
+ ┃ ┃ ┣ 📜fetch_categories.php
+ ┃ ┃ ┣ 📜fetch_distributions.php
+ ┃ ┃ ┣ 📜fetch_items_by_category.php
+ ┃ ┃ ┣ 📜fetch_items_by_classification.php
+ ┃ ┃ ┣ 📜fetch_single_allocation.php
+ ┃ ┃ ┣ 📜fetch_suppliers.php
+ ┃ ┃ ┣ 📜generate_allocation_report.php
+ ┃ ┃ ┣ 📜generate_report.php
+ ┃ ┃ ┣ 📜get_allocation.php
+ ┃ ┃ ┣ 📜get_distributions.php
+ ┃ ┃ ┣ 📜overall_report.php
+ ┃ ┃ ┣ 📜search_classification.php
+ ┃ ┃ ┗ 📜supplier_form.php
+ ┃ ┣ 📜allitems.php
+ ┃ ┣ 📜allocation.php
+ ┃ ┣ 📜dashboard.php
+ ┃ ┣ 📜distributions.php
+ ┃ ┣ 📜items.php
+ ┃ ┣ 📜item_form.php
+ ┃ ┗ 📜print_receipt.php
+ ┣ 📂vendor
+ ┣ 📜.gitignore.php
+ ┣ 📜composer.json
+ ┣ 📜composer.lock
+ ┣ 📜folderstructure.txt
+ ┣ 📜index.php
+ ┣ 📜log.txt
+ ┣ 📜logout.php
+ ┣ 📜package-lock.json
+ ┣ 📜package.json
+ ┣ 📜tailwind.config.js
+ ┣ 📜test.php
+ ┗ 📜test_db.php

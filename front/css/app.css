@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 🌟 Smooth table transitions */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.table-row-animate {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.table-row-highlight {
+  animation: fadeInUp 0.4s ease forwards, pulseHighlight 1.5s ease;
+}
+
+@keyframes pulseHighlight {
+  0% { background-color: #dcfce7; } /* soft green */
+  100% { background-color: transparent; }
+}
+
