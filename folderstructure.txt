@@ -155,7 +155,8 @@ this is the folder structure that i have, all of this is stored inside the xampp
  ┃ ┣ 📜item_form.php
  ┃ ┗ 📜print_receipt.php
  ┣ 📂vendor
- ┣ 📜.gitignore.php
+ ┣ 📜.env
+ ┣ 📜.gitignore
  ┣ 📜composer.json
  ┣ 📜composer.lock
  ┣ 📜folderstructure.txt
