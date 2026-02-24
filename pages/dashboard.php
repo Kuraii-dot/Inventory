@@ -30,10 +30,12 @@ $recentItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch category data for charts
 $categoryData = $conn->query("
-  SELECT c.name AS category, COUNT(i.id) AS item_count, COALESCE(SUM(i.quantity), 0) AS total_stock
+  SELECT c.name AS category, 
+         COUNT(i.id) AS item_count, 
+         COALESCE(SUM(i.quantity), 0) AS total_stock
   FROM categories c
   LEFT JOIN items i ON i.category_id = c.id
-  GROUP BY c.id
+  GROUP BY c.id, c.name
   ORDER BY c.name ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
