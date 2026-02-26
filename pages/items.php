@@ -1194,5 +1194,5 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 </script>
-<script src="/InventorySys/front/js/classifications.js"></script>
+<script src="https://inventory-ys8f.onrender.com/InventorySys/front/js/classifications.js"></script>
 <?php include '../includes/footer.php'; ?>
