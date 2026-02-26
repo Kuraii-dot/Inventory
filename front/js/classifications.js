@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const formData = new FormData(form);
 
-            const res = await fetch('/InventorySys/actions/add_classification.php', {
+            const res = await fetch('/actions/add_classification.php', {
                 method: 'POST',
                 body: formData
             });
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const list = document.getElementById('classificationList');
         if (!list) return;
 
-        const res = await fetch('/InventorySys/actions/get_classification.php');
+        const res = await fetch('/actions/get_classification.php');
         const data = await res.json();
 
         list.innerHTML = '';
@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('item_id', e.target.dataset.itemId);
         formData.append('classification_id', e.target.value);
 
-        const res = await fetch('/InventorySys/actions/assign_classification.php', {
+        const res = await fetch('/actions/assign_classification.php', {
             method: 'POST',
             body: formData
         });
