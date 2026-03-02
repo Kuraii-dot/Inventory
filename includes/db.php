@@ -1,12 +1,12 @@
 <?php
-// includes/db.php - Updated for Neon
+// includes/db.php - Updated for Supabase
 
-$host = 'ep-frosty-paper-aiqukrya-pooler.c-4.us-east-1.aws.neon.tech';
-$dbname = 'neondb';
-$user = 'neondb_owner';
-$pass = 'npg_ay1P4YiMDoXG';
-$port = '5432';
-$sslmode = 'require'; // Neon requires SSL
+$host = getenv('DB_HOST');      // aws-1-ap-southeast-1.pooler.supabase.com
+$dbname = getenv('DB_NAME');    // postgres
+$user = getenv('DB_USER');      // postgres.mkawcgjmlpykppuorjqd
+$pass = getenv('DB_PASS');      // Supabase DB password
+$port = getenv('DB_PORT');      // 5432
+$sslmode = 'require';           // Supabase requires SSL for pooler
 
 try {
     // DSN with SSL included
@@ -15,7 +15,7 @@ try {
 
     // Keep your error mode and attribute settings intact
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    // echo "✅ Connected to Neon successfully!";
+    // echo "✅ Connected to Supabase successfully!";
 } catch (PDOException $e) {
     die("❌ Database connection failed: " . $e->getMessage());
 }
