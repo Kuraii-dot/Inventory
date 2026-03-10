@@ -10,7 +10,7 @@ require_once '../includes/header.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
     $name = $_POST['name'];
     $category_id = $_POST['category_id'];
-    $classification_id = !empty($_POST['classification_id']) ? $_POST['classification_id'] : null; // 👈 new
+    $classification_id = !empty($_POST['classification_id']) ? $_POST['classification_id'] : null;
     $supplier_id = $_POST['supplier_id'];
     $quantity = $_POST['quantity'];
     $unit_price = $_POST['unit_price'];
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_item'])) {
         $stmt->execute([
             ':name' => $name,
             ':category_id' => $category_id,
-            ':classification_id' => $classification_id, // 👈 new
+            ':classification_id' => $classification_id,
             ':supplier_id' => $supplier_id,
             ':quantity' => $quantity,
             ':unit_price' => $unit_price,
@@ -591,7 +591,7 @@ if (!empty($category_id)) {
   <select name="classification_id" id="classificationSelect" disabled
           class="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
     <option value="">Select Classification</option>
-    <!-- Options will be loaded in here -->
+    <!-- Options kineme will be loaded in here -->
   </select>
 </div>
 
@@ -653,8 +653,7 @@ if (!empty($category_id)) {
           Cancel
         </button>
         <button type="submit" name="add_item"
-                class="px-8 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semib
-old rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
+                class="px-8 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-300">
           Save Item
         </button>
       </div>

@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Inventory System</title>
-<link href="../front/css/output.css" rel="stylesheet">
-<body class="bg-gray-100 min-h-screen">
+  <link href="../front/css/output.css" rel="stylesheet">
+  <link href="../front/css/app.css" rel="stylesheet">
+  <script src="../front/js/starfield.js"></script>
+<body class="bg-transparent min-h-screen" data-starfield>
 
 <!-- Navigation -->
 <nav class="bg-gradient-to-r from-slate-50 to-blue-50 backdrop-blur-sm border-b border-slate-200/60 shadow-sm">

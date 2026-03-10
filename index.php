@@ -94,22 +94,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
           </button>
         </form>
       </div>
-      
-      <!-- Image Section -->
-      <div class="relative md:flex-1">
-        <img src="/Projects/InventorySys/includes/BG.svg"
-     alt="LOGO"
-     class="w-full h-full object-cover rounded-r-2xl hidden md:block">
-     </div>
-
-        <!-- Overlay Text -->
-        <div class="absolute hidden bottom-10 right-6 p-6 bg-white bg-opacity-30 backdrop-blur-sm rounded-xl drop-shadow-lg md:block max-w-sm">
-          <span class="text-white text-xl font-medium leading-relaxed">
-            Inventory Management System, Keeping Track Made Easy.<br>
-            <span class="text-sm">multi-user access | real-time updates | detailed reports</span><br>
-            <span class="text-lg font-bold">Streamline your inventory today!</span>
-          </span>
-        </div>
       </div>
     </div>
   </div>

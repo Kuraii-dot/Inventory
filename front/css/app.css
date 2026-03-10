@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🌟 Starfield Background */
+html {
+  background: linear-gradient(to bottom, #0a0c14 0%, #0f1420 50%, #151825 100%);
+  min-height: 100%;
+}
+
+body {
+  background: transparent;
+}
+
+/* Make main content containers semi-transparent */
+main, .content-container, .max-w-7xl {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* Make cards semi-transparent */
+.bg-white, .bg-gray-100, [class*="bg-white"] {
+  background: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Make tables semi-transparent */
+table, .table-container {
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
 /* 🌟 Smooth table transitions */
 @keyframes fadeInUp {
   from {

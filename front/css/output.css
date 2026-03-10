@@ -930,10 +930,6 @@ video {
   width: 2.25rem;
 }
 
-.w-\[1100px\] {
-  width: 1100px;
-}
-
 .w-\[1400px\] {
   width: 1400px;
 }
@@ -982,10 +978,6 @@ video {
 
 .max-w-xs {
   max-width: 20rem;
-}
-
-.max-w-full {
-  max-width: 100%;
 }
 
 .flex-1 {
@@ -1532,6 +1524,10 @@ video {
 
 .bg-slate-50\/50 {
   background-color: rgb(248 250 252 / 0.5);
+}
+
+.bg-transparent {
+  background-color: transparent;
 }
 
 .bg-violet-50 {
@@ -2452,6 +2448,37 @@ video {
 
 .ease-in {
   transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* 🌟 Starfield Background */
+
+html {
+  background: linear-gradient(to bottom, #0a0c14 0%, #0f1420 50%, #151825 100%);
+  min-height: 100%;
+}
+
+body {
+  background: transparent;
+}
+
+/* Make main content containers semi-transparent */
+
+main, .content-container, .max-w-7xl {
+  background: rgba(255, 255, 255, 0.7) !important;
+  -webkit-backdrop-filter: blur(10px);
+          backdrop-filter: blur(10px);
+}
+
+/* Make cards semi-transparent */
+
+.bg-white, .bg-gray-100, [class*="bg-white"] {
+  background: rgba(255, 255, 255, 0.75) !important;
+}
+
+/* Make tables semi-transparent */
+
+table, .table-container {
+  background: rgba(255, 255, 255, 0.85) !important;
 }
 
 /* 🌟 Smooth table transitions */
