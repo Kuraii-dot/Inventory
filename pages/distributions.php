@@ -1945,7 +1945,7 @@ document.getElementById('closeEditModal')?.addEventListener('click', () => {
 document.getElementById('editForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const result = await (await fetch('/InventorySys/actions/edit_distribution.php', {
+    const result = await (await fetch('/actions/edit_distribution.php', {
       method: 'POST', body: new FormData(e.target)
     })).json();
     if (result.status === 'success') {
@@ -1965,7 +1965,7 @@ document.getElementById('editForm')?.addEventListener('submit', async e => {
 function deleteDistribution(id) {
   if (!confirm('Are you sure you want to delete this distribution? The stock will be restored.')) return;
   const fd = new FormData(); fd.append('id', id);
-  fetch('/InventorySys/actions/delete_distribution.php', { method: 'POST', body: fd })
+  fetch('/actions/delete_distribution.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => {
       if (data.status === 'success') {
@@ -2005,7 +2005,7 @@ document.getElementById('closeReturnModal')?.addEventListener('click', () => {
 document.getElementById('returnForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const result = await (await fetch('/InventorySys/actions/return_distribution.php', {
+    const result = await (await fetch('/actions/return_distribution.php', {
       method: 'POST', body: new FormData(e.target)
     })).json();
     if (result.status === 'success') {

@@ -1193,5 +1193,5 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 </script>
-<script src="/InventorySys/front/js/classifications.js"></script>
+<script src="../front/js/classifications.js"></script>
 <?php include '../includes/footer.php'; ?>

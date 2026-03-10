@@ -1037,7 +1037,7 @@ document.getElementById('addItemRowBtn')?.addEventListener('click', async () => 
 document.getElementById('allocateForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const res    = await fetch('/InventorySys/actions/add_allocation.php', { method: 'POST', body: new FormData(e.target) });
+    const res    = await fetch('/actions/add_allocation.php', { method: 'POST', body: new FormData(e.target) });
     const result = await res.json();
     if (result.status === 'success') {
       closeModal('allocateItemsModal');
@@ -1107,7 +1107,7 @@ document.getElementById('edit_category')?.addEventListener('change', async funct
 document.getElementById('editForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const res    = await fetch('/InventorySys/actions/edit_allocation.php', { method: 'POST', body: new FormData(e.target) });
+    const res    = await fetch('/actions/edit_allocation.php', { method: 'POST', body: new FormData(e.target) });
     const result = await res.json();
     if (result.status === 'success') {
       closeModal('editAllocationModal');
@@ -1121,7 +1121,7 @@ document.getElementById('editForm')?.addEventListener('submit', async e => {
 function deleteAllocation(id) {
   if (!confirm('Are you sure you want to delete this allocation? The stock will be restored.')) return;
   const fd = new FormData(); fd.append('id', id);
-  fetch('/InventorySys/actions/delete_allocation.php', { method: 'POST', body: fd })
+  fetch('/actions/delete_allocation.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(data => {
       if (data.status === 'success') { showToast(`✅ ${data.message}`); loadAllocations(); }
@@ -1150,7 +1150,7 @@ async function returnAllocation(id) {
 document.getElementById('returnForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   try {
-    const res    = await fetch('/InventorySys/actions/return_allocation.php', { method: 'POST', body: new FormData(e.target) });
+    const res    = await fetch('/actions/return_allocation.php', { method: 'POST', body: new FormData(e.target) });
     const result = await res.json();
     if (result.status === 'success') {
       closeModal('returnModal');
