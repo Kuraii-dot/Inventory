@@ -18,7 +18,15 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors({ origin: '*', credentials: false }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || origin.endsWith('.vercel.app') || origin.includes('localhost'))
+      callback(null, true);
+    else
+      callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
