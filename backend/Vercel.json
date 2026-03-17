@@ -1,19 +1,9 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "routes/**",
-          "controllers/**",
-          "middleware/**",
-          "db/**"
-        ]
-      }
+  "functions": {
+    "server.js": {
+      "runtime": "@vercel/node@3.2.22"
     }
-  ],
+  },
   "routes": [
     { "src": "/(.*)", "dest": "server.js" }
   ]
