@@ -1,48 +1,64 @@
-📦InventorySys - Copy
+📦InventorySys
  ┣ 📂backend
  ┃ ┣ 📂controllers
  ┃ ┃ ┣ 📜allocationsController.js
- ┃ ┃ ┣ 📜Authcontrollers.js
+ ┃ ┃ ┣ 📜authController.js
  ┃ ┃ ┣ 📜categoriesController.js
  ┃ ┃ ┣ 📜classificationsController.js
+ ┃ ┃ ┣ 📜combinationsController.js
  ┃ ┃ ┣ 📜dashboardController.js
  ┃ ┃ ┣ 📜distributionsController.js
  ┃ ┃ ┣ 📜itemsController.js
+ ┃ ┃ ┣ 📜ledgerController.js
  ┃ ┃ ┣ 📜reportsController.js
- ┃ ┃ ┗ 📜supplierController.js
+ ┃ ┃ ┗ 📜suppliersController.js
  ┃ ┣ 📂db
  ┃ ┃ ┗ 📜pool.js
  ┃ ┣ 📂middleware
  ┃ ┃ ┗ 📜auth.js
+ ┃ ┣ 📂node_modules
  ┃ ┣ 📂routes
  ┃ ┃ ┣ 📜allocations.js
  ┃ ┃ ┣ 📜auth.js
  ┃ ┃ ┣ 📜categories.js
  ┃ ┃ ┣ 📜classifications.js
+ ┃ ┃ ┣ 📜combinations.js
  ┃ ┃ ┣ 📜dashboard.js
  ┃ ┃ ┣ 📜distributions.js
  ┃ ┃ ┣ 📜items.js
+ ┃ ┃ ┣ 📜ledger.js
  ┃ ┃ ┣ 📜reports.js
  ┃ ┃ ┗ 📜suppliers.js
+ ┃ ┣ 📜.env
+ ┃ ┣ 📜.env.example
+ ┃ ┣ 📜package-lock.json
+ ┃ ┣ 📜package.json
  ┃ ┗ 📜server.js
- ┣ 📂frontend 
+ ┣ 📂frontend
+ ┃ ┣ 📂dist
+ ┃ ┣ 📂node_modules
  ┃ ┣ 📂src
  ┃ ┃ ┣ 📂api
  ┃ ┃ ┃ ┣ 📜allocations.js
  ┃ ┃ ┃ ┣ 📜auth.js
  ┃ ┃ ┃ ┣ 📜client.js
+ ┃ ┃ ┃ ┣ 📜combinations.js
  ┃ ┃ ┃ ┣ 📜dashboard.js
  ┃ ┃ ┃ ┣ 📜items.js
  ┃ ┃ ┃ ┗ 📜reports.js
  ┃ ┃ ┣ 📂components
+ ┃ ┃ ┃ ┣ 📂distributions
+ ┃ ┃ ┃ ┃ ┗ 📜CombinationsModal.jsx
  ┃ ┃ ┃ ┣ 📂items
  ┃ ┃ ┃ ┃ ┣ 📜AddItemModal.jsx
  ┃ ┃ ┃ ┃ ┣ 📜CategoryModal.jsx
+ ┃ ┃ ┃ ┃ ┣ 📜ClassificationModal.jsx
  ┃ ┃ ┃ ┃ ┣ 📜EditItemModal.jsx
  ┃ ┃ ┃ ┃ ┗ 📜SupplierModal.jsx
  ┃ ┃ ┃ ┣ 📜GroupedTable.jsx
  ┃ ┃ ┃ ┣ 📜ItemRows.jsx
  ┃ ┃ ┃ ┣ 📜Modal.jsx
+ ┃ ┃ ┃ ┣ 📜Navbar.jsx
  ┃ ┃ ┃ ┣ 📜ProtectedRoute.jsx
  ┃ ┃ ┃ ┗ 📜ReportModal.jsx
  ┃ ┃ ┣ 📂context
@@ -62,11 +78,9 @@
  ┃ ┣ 📜index.html
  ┃ ┣ 📜package-lock.json
  ┃ ┣ 📜package.json
+ ┃ ┣ 📜vercel.json
  ┃ ┗ 📜vite.config.js
- ┣ 📂logs
  ┣ 📂node_modules
- ┣ 📜.env
- ┣ 📜.env.example
  ┣ 📜.gitignore
  ┣ 📜composer.json
  ┣ 📜composer.lock
@@ -75,5 +89,4 @@
  ┣ 📜generate_hash.php
  ┣ 📜log.txt
  ┣ 📜package-lock.json
- ┣ 📜package.json
  ┗ 📜tailwind.config.js
