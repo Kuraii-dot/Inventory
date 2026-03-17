@@ -78,9 +78,9 @@
  ┃ ┣ 📜index.html
  ┃ ┣ 📜package-lock.json
  ┃ ┣ 📜package.json
- ┃ ┣ 📜vercel.json
  ┃ ┗ 📜vite.config.js
  ┣ 📂node_modules
+ ┣ 📂vendor
  ┣ 📜.gitignore
  ┣ 📜composer.json
  ┣ 📜composer.lock
