@@ -17,27 +17,43 @@ import ledgerRoutes         from './routes/ledger.js';
 
 dotenv.config();
 
-const app  = express();
-const PORT = process.env.PORT || 5000;
+const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN,
+  'http://localhost:5173',
+  'http://localhost:5174',
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/api/auth',           authRoutes);
-app.use('/api/dashboard',      dashboardRoutes);
-app.use('/api/items',          itemRoutes);
-app.use('/api/suppliers',      supplierRoutes);
-app.use('/api/categories',     categoryRoutes);
-app.use('/api/classifications', classificationRoutes);
-app.use('/api/allocations',    allocationRoutes);
-app.use('/api/distributions',  distributionRoutes);
-app.use('/api/reports',        reportRoutes);
-app.use('/api/combinations',   combinationRoutes);
-app.use('/api/ledger',         ledgerRoutes);
+app.use('/api/auth',            authRoutes);
+app.use('/api/dashboard',       dashboardRoutes);
+app.use('/api/items',           itemRoutes);
+app.use('/api/suppliers',       supplierRoutes);
+app.use('/api/categories',      categoryRoutes);
+app.use('/api/classifications',  classificationRoutes);
+app.use('/api/allocations',     allocationRoutes);
+app.use('/api/distributions',   distributionRoutes);
+app.use('/api/reports',         reportRoutes);
+app.use('/api/combinations',    combinationRoutes);
+app.use('/api/ledger',          ledgerRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+// Local dev only
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+}
+
+export default app;

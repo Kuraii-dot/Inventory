@@ -6,12 +6,17 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(),  // Tailwind v4 — replaces postcss.config.js entirely
+    tailwindcss(),
   ],
+  base: '/',
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
   server: {
     port: 5173,
     proxy: {
-      // Proxy all /api requests to Express during development
+      // Dev only — in production Vercel routes /api directly to backend
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

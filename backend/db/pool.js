@@ -1,30 +1,27 @@
 // backend/db/pool.js
-// Converted from: includes/db.php
-// PHP used PDO with pgsql driver — Node.js equivalent is the `pg` Pool
-
 import pg from 'pg';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
 const { Pool } = pg;
 
-const pool = new Pool({
-  host:     process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  user:     process.env.DB_USER,
-  password: process.env.DB_PASS,
-  port:     Number(process.env.DB_PORT) || 5432,
-});
+// Supports both individual vars (local) and DATABASE_URL (Supabase/production)
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }, // required for Supabase
+      }
+    : {
+        host:     process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        user:     process.env.DB_USER,
+        password: process.env.DB_PASS,
+        port:     parseInt(process.env.DB_PORT || '5432'),
+      }
+);
 
-// Test connection on startup (mirrors the try/catch in db.php)
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('❌ Database connection failed:', err.message);
-    process.exit(1);
-  }
-  console.log('✅ Database connected successfully!');
-  release();
-});
+pool.on('connect', () => console.log('✅ Database connected'));
+pool.on('error',   (err) => console.error('❌ Database error:', err));
 
 export default pool;
