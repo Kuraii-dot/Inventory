@@ -1,9 +1,6 @@
 // backend/db/pool.js
 import pg from 'pg';
 
-// Note: no dotenv.config() needed — Vercel injects env vars directly
-// dotenv.config() is only needed locally, and it's called in server.js already
-
 const { Pool } = pg;
 
 const pool = new Pool({
@@ -13,6 +10,10 @@ const pool = new Pool({
   password: process.env.DB_PASS,
   port:     parseInt(process.env.DB_PORT || '5432'),
   ssl:      { rejectUnauthorized: false },
+  // Neon requires these connection options
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis:       30000,
+  max:                     10,
 });
 
 pool.on('connect', () => console.log('✅ Database connected'));
