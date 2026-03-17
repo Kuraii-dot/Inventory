@@ -27,18 +27,10 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (server-to-server, mobile)
-    // Allow all Vercel preview URLs (*.vercel.app)
-    // Allow explicitly listed origins
-    if (
-      !origin ||
-      origin.endsWith('.vercel.app') ||
-      allowedOrigins.includes(origin)
-    ) {
+    if (!origin || origin.endsWith('.vercel.app') || allowedOrigins.includes(origin))
       callback(null, true);
-    } else {
+    else
       callback(new Error('Not allowed by CORS'));
-    }
   },
   credentials: true,
 }));
@@ -60,7 +52,7 @@ app.use('/api/ledger',          ledgerRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// Local dev only
+// Local dev
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
