@@ -2,15 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend/server.js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist"
       }
+    },
+    {
+      "src": "backend/server.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -23,7 +23,16 @@
       "dest": "frontend/dist/assets/$1"
     },
     {
-      "handle": "filesystem"
+      "src": "/favicon.ico",
+      "dest": "frontend/dist/favicon.ico"
+    },
+    {
+      "src": "/(.*)\\.js",
+      "dest": "frontend/dist/$1.js"
+    },
+    {
+      "src": "/(.*)\\.css",
+      "dest": "frontend/dist/$1.css"
     },
     {
       "src": "/(.*)",
