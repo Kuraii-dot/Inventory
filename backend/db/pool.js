@@ -3,7 +3,6 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-// Use DATABASE_URL if available, otherwise fall back to individual vars
 const pool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -18,7 +17,12 @@ const pool = process.env.DATABASE_URL
       ssl:      { rejectUnauthorized: false },
     });
 
-pool.on('connect', () => console.log('✅ Database connected'));
-pool.on('error',   (err) => console.error('❌ Database error:', err));
+// Set search_path to public on every new connection
+pool.on('connect', (client) => {
+  client.query("SET search_path TO public");
+  console.log('✅ Database connected');
+});
+
+pool.on('error', (err) => console.error('❌ Database error:', err));
 
 export default pool;
