@@ -3,26 +3,25 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
-const pool = process.env.DATABASE_URL
-  ? new Pool({
+const config = process.env.DATABASE_URL
+  ? {
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-    })
-  : new Pool({
+      options: '-c search_path=public',
+    }
+  : {
       host:     process.env.DB_HOST,
       database: process.env.DB_NAME,
       user:     process.env.DB_USER,
       password: process.env.DB_PASS,
       port:     parseInt(process.env.DB_PORT || '5432'),
       ssl:      { rejectUnauthorized: false },
-    });
+      options:  '-c search_path=public',
+    };
 
-// Set search_path to public on every new connection
-pool.on('connect', (client) => {
-  client.query("SET search_path TO public");
-  console.log('✅ Database connected');
-});
+const pool = new Pool(config);
 
-pool.on('error', (err) => console.error('❌ Database error:', err));
+pool.on('connect', () => console.log('✅ Database connected'));
+pool.on('error',   (err) => console.error('❌ Database error:', err));
 
 export default pool;
