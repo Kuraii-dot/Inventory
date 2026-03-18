@@ -36,15 +36,6 @@ export async function login(req, res) {
 
     const user = result.rows[0];
 
-    // Debug logs — remove after fixing
-    console.log('User found:', user ? user.username : 'NOT FOUND');
-    console.log('Password from DB:', user?.password?.substring(0, 10));
-    console.log('Password entered:', password);
-    if (user) {
-      const match = await bcrypt.compare(password, user.password);
-      console.log('Password match:', match);
-    }
-
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
