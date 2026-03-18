@@ -15,4 +15,11 @@ router.post('/logout', authenticate, logout);
 // GET  /api/auth/me      — returns current user (for React rehydration)
 router.get('/me', authenticate, me);
 
+// TEMP: hash generator — remove after fixing
+import bcrypt from 'bcryptjs';
+router.get('/hash/:password', async (req, res) => {
+  const hash = await bcrypt.hash(req.params.password, 10);
+  res.json({ hash });
+});
+
 export default router;
