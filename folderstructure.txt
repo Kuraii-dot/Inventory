@@ -75,6 +75,7 @@
  ┃ ┃ ┣ 📜App.jsx
  ┃ ┃ ┣ 📜index.css
  ┃ ┃ ┗ 📜main.jsx
+ ┃ ┣ 📜.env
  ┃ ┣ 📜index.html
  ┃ ┣ 📜package-lock.json
  ┃ ┣ 📜package.json
