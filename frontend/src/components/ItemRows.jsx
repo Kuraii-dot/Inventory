@@ -1,6 +1,6 @@
 // frontend/src/components/ItemRows.jsx
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   fetchCategories, fetchClassifications,
   fetchItemsByClassification, fetchItemsByCategory,
@@ -14,7 +14,7 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
   const [itemOptions,  setItemOptions]  = useState([]);
   const [stockWarning, setStockWarning] = useState(null);
 
-  // Load cascade when category_id changes (including pre-fill from combinations)
+  // Load cascade when category_id changes or is pre-filled
   useEffect(() => {
     if (!row.category_id) {
       setClsOptions([]);
@@ -26,7 +26,6 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
       if (showClassification) {
         const cls = await fetchClassifications(row.category_id);
         setClsOptions(cls);
-        // If classification already set (pre-fill), load items too
         if (row.classification_id) {
           const items = await fetchItemsByClassification(row.classification_id);
           setItemOptions(items);
@@ -41,7 +40,6 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
   }, [row.category_id, row.classification_id, showClassification]);
 
   async function handleCategoryChange(val) {
-    // Update all three fields in ONE call to avoid stale state
     onRowChange(idx, { category_id: val, classification_id: '', item_id: '' });
     setClsOptions([]);
     setItemOptions([]);
@@ -140,12 +138,20 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
 
 export default function ItemRows({ value, onChange, showClassification = true }) {
   const [categories, setCategories] = useState([]);
+  const loadedRef = useRef(false);
 
+  // Load categories once and cache — also reload if categories is empty
   useEffect(() => {
-    fetchCategories().then(setCategories).catch(console.error);
-  }, []);
+    if (loadedRef.current && categories.length > 0) return;
+    loadedRef.current = true;
+    fetchCategories()
+      .then(data => {
+        if (data?.length > 0) setCategories(data);
+      })
+      .catch(console.error);
+  });
 
-  // Update multiple fields at once in one setState call — fixes stale state bug
+  // Update multiple fields at once — fixes stale state bug
   function onRowChange(idx, fields) {
     onChange(value.map((row, i) => i === idx ? { ...row, ...fields } : row));
   }
