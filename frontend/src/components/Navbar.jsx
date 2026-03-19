@@ -43,9 +43,8 @@ export default function Navbar() {
 
           {/* ── Logo / Brand ─────────────────────────────── */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg shadow-md overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
-              {/* Replace with <img src="/logo.png"> if you add your logo to frontend/public/ */}
-              <span className="text-white text-lg font-bold">SI</span>
+            <div className="w-10 h-10 rounded-lg shadow-md overflow-hidden flex items-center justify-center">
+              <img src="/public/Logo.png" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
