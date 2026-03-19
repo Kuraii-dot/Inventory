@@ -9,12 +9,12 @@ import {
 
 const EMPTY_ROW = { category_id: '', classification_id: '', item_id: '', quantity: '' };
 
-function ItemRow({ row, idx, categories, onChange, onRemove, showRemove, showClassification }) {
+function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, showClassification }) {
   const [clsOptions,   setClsOptions]   = useState([]);
   const [itemOptions,  setItemOptions]  = useState([]);
   const [stockWarning, setStockWarning] = useState(null);
 
-  // Load full cascade whenever category_id changes or is pre-filled
+  // Load cascade when category_id changes (including pre-fill from combinations)
   useEffect(() => {
     if (!row.category_id) {
       setClsOptions([]);
@@ -24,17 +24,14 @@ function ItemRow({ row, idx, categories, onChange, onRemove, showRemove, showCla
 
     async function loadForCategory() {
       if (showClassification) {
-        // Load classifications for this category
         const cls = await fetchClassifications(row.category_id);
         setClsOptions(cls);
-
-        // If classification already set (pre-fill), also load items
+        // If classification already set (pre-fill), load items too
         if (row.classification_id) {
           const items = await fetchItemsByClassification(row.classification_id);
           setItemOptions(items);
         }
       } else {
-        // No classification — load items directly
         const items = await fetchItemsByCategory(row.category_id);
         setItemOptions(items);
       }
@@ -42,11 +39,26 @@ function ItemRow({ row, idx, categories, onChange, onRemove, showRemove, showCla
 
     loadForCategory().catch(console.error);
   }, [row.category_id, row.classification_id, showClassification]);
-  // Note: include row.classification_id so when combo pre-fills both,
-  // the items load correctly in the same effect run
+
+  async function handleCategoryChange(val) {
+    // Update all three fields in ONE call to avoid stale state
+    onRowChange(idx, { category_id: val, classification_id: '', item_id: '' });
+    setClsOptions([]);
+    setItemOptions([]);
+  }
+
+  async function handleClassificationChange(val) {
+    onRowChange(idx, { classification_id: val, item_id: '' });
+    if (val) {
+      const items = await fetchItemsByClassification(val);
+      setItemOptions(items);
+    } else {
+      setItemOptions([]);
+    }
+  }
 
   async function handleQtyChange(qty) {
-    onChange(idx, 'quantity', qty);
+    onRowChange(idx, { quantity: qty });
     if (!row.item_id || !qty || parseInt(qty) <= 0) { setStockWarning(null); return; }
     try {
       const result = await validateStock(row.item_id, parseInt(qty));
@@ -70,12 +82,7 @@ function ItemRow({ row, idx, categories, onChange, onRemove, showRemove, showCla
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Category *</label>
           <select value={row.category_id}
-            onChange={e => {
-              onChange(idx, 'category_id', e.target.value);
-              onChange(idx, 'classification_id', '');
-              onChange(idx, 'item_id', '');
-              setClsOptions([]); setItemOptions([]);
-            }}
+            onChange={e => handleCategoryChange(e.target.value)}
             required className={sel}>
             <option value="">Select Category</option>
             {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
@@ -87,16 +94,7 @@ function ItemRow({ row, idx, categories, onChange, onRemove, showRemove, showCla
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Classification</label>
             <select value={row.classification_id}
-              onChange={async e => {
-                onChange(idx, 'classification_id', e.target.value);
-                onChange(idx, 'item_id', '');
-                if (e.target.value) {
-                  const items = await fetchItemsByClassification(e.target.value);
-                  setItemOptions(items);
-                } else {
-                  setItemOptions([]);
-                }
-              }}
+              onChange={e => handleClassificationChange(e.target.value)}
               disabled={clsOptions.length === 0}
               className={`${sel} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
               <option value="">Select Classification</option>
@@ -109,7 +107,7 @@ function ItemRow({ row, idx, categories, onChange, onRemove, showRemove, showCla
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Item *</label>
           <select value={row.item_id}
-            onChange={e => onChange(idx, 'item_id', e.target.value)}
+            onChange={e => onRowChange(idx, { item_id: e.target.value })}
             disabled={itemOptions.length === 0}
             required className={`${sel} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
             <option value="">Select Item</option>
@@ -147,9 +145,11 @@ export default function ItemRows({ value, onChange, showClassification = true })
     fetchCategories().then(setCategories).catch(console.error);
   }, []);
 
-  function updateRow(idx, field, val) {
-    onChange(value.map((row, i) => i === idx ? { ...row, [field]: val } : row));
+  // Update multiple fields at once in one setState call — fixes stale state bug
+  function onRowChange(idx, fields) {
+    onChange(value.map((row, i) => i === idx ? { ...row, ...fields } : row));
   }
+
   function addRow()       { onChange([...value, { ...EMPTY_ROW }]); }
   function removeRow(idx) { onChange(value.filter((_, i) => i !== idx)); }
 
@@ -161,7 +161,7 @@ export default function ItemRows({ value, onChange, showClassification = true })
           row={row}
           idx={idx}
           categories={categories}
-          onChange={updateRow}
+          onRowChange={onRowChange}
           onRemove={removeRow}
           showRemove={value.length > 1}
           showClassification={showClassification}

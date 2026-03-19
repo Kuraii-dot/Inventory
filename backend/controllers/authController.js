@@ -9,8 +9,8 @@
 //   session_destroy()             → client discards token (stateless JWT)
 
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import pool from '../db/pool.js';
+import jwt    from 'jsonwebtoken';
+import pool   from '../db/pool.js';
 
 /**
  * POST /api/auth/login
@@ -36,7 +36,6 @@ export async function login(req, res) {
 
     const user = result.rows[0];
 
-    // password_verify() equivalent
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
@@ -48,6 +47,14 @@ export async function login(req, res) {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
+
+    // Log login activity
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || null;
+    pool.query(
+      `INSERT INTO activity_logs (user_id, username, action, module, description, ip_address)
+       VALUES ($1, $2, 'LOGIN', 'auth', $3, $4)`,
+      [user.id, user.username, `${user.username} logged in`, ip]
+    ).catch(err => console.error('Login log error:', err.message));
 
     return res.json({
       token,

@@ -39,9 +39,15 @@ export function authenticate(req, res, next) {
  *
  * Usage: router.post('/admin-only', authenticate, requireRole('admin'), handler)
  */
-export function requireRole(role) {
+export function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.user || req.user.role !== role) {
+    if (!req.user) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+    // master_admin can access everything
+    if (req.user.role === 'master_admin') return next();
+    // Check if user has one of the required roles
+    if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Access denied.' });
     }
     next();

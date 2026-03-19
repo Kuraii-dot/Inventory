@@ -12,7 +12,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const NAV_LINKS = [
+const BASE_LINKS = [
   { to: '/dashboard',     label: 'Dashboard'     },
   { to: '/allitems',      label: 'All Items'      },
   { to: '/allocation',    label: 'Allocation'     },
@@ -32,6 +32,10 @@ export default function Navbar() {
   // Don't render navbar on login page
   if (!user) return null;
 
+  const NAV_LINKS = user.role === 'master_admin'
+    ? [...BASE_LINKS, { to: '/admin', label: '🛡️ Admin' }]
+    : BASE_LINKS;
+
   return (
     <nav className="bg-gradient-to-r from-slate-50 to-blue-50 backdrop-blur-sm border-b border-slate-200/60 shadow-sm sticky top-0 z-40">
       <div className="max-w-screen-xl mx-auto px-8 py-4">
@@ -40,7 +44,8 @@ export default function Navbar() {
           {/* ── Logo / Brand ─────────────────────────────── */}
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-lg shadow-md overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
-                <img src="/Logo.png" alt="Logo" className="w-full h-full object-cover" />
+              {/* Replace with <img src="/logo.png"> if you add your logo to frontend/public/ */}
+              <span className="text-white text-lg font-bold">SI</span>
             </div>
             <div>
               <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">

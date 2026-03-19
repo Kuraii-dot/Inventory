@@ -10,6 +10,7 @@ import Items             from './pages/Items.jsx';
 import AllItems          from './pages/AllItems.jsx';
 import Allocation        from './pages/Allocation.jsx';
 import Distributions     from './pages/Distributions.jsx';
+import Admin             from './pages/Admin.jsx';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/allitems"      element={<ProtectedRoute><AllItems /></ProtectedRoute>} />
           <Route path="/allocation"    element={<ProtectedRoute><Allocation /></ProtectedRoute>} />
           <Route path="/distributions" element={<ProtectedRoute><Distributions /></ProtectedRoute>} />
+          <Route path="/admin"         element={<ProtectedRoute><Admin /></ProtectedRoute>} />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/login" replace />} />
