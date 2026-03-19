@@ -16,3 +16,8 @@ router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, me);
 
 export default router;
+import bcrypt from 'bcryptjs';
+router.get('/hash/:password', async (req, res) => {
+  const hash = await bcrypt.hash(req.params.password, 10);
+  res.json({ hash });
+});
