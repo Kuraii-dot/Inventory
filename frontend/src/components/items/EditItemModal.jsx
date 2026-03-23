@@ -116,6 +116,7 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
               <label className="block text-sm font-medium text-slate-700 mb-2">Unit *</label>
               <select name="unit" required value={form.unit} onChange={handleChange} className={inputCls}>
                 <option value="Pc">Pc</option>
+                <option value="Set">Set</option>
                 <option value="Pcs">Pcs</option>
                 <option value="Mtr">Mtr</option>
                 <option value="Mtrs">Mtrs</option>
