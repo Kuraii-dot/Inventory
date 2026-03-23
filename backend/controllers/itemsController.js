@@ -201,7 +201,7 @@ export async function addItem(req, res) {
     quantity, unit_price, unit, date_ordered, date_procured
   } = req.body;
 
-  if (!name || !category_id || !supplier_id || !quantity || !unit_price || !date_ordered || !date_procured) {
+  if (!name || !category_id || !supplier_id || quantity === undefined || quantity === '' || !unit_price || !date_ordered || !date_procured) {
     return res.status(400).json({ success: false, message: 'All fields are required.' });
   }
 

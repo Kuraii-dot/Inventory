@@ -94,7 +94,7 @@ export default function AddItemModal({ open, onClose, categories, suppliers, onS
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Quantity *</label>
-            <input type="number" name="quantity" required min="1" value={form.quantity} onChange={handleChange}
+            <input type="number" name="quantity" required min="0" value={form.quantity} onChange={handleChange}
               className={inputCls} placeholder="0" />
           </div>
           <div>
