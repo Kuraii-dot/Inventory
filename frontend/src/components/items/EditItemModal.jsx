@@ -121,6 +121,8 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
                 <option value="Mtr">Mtr</option>
                 <option value="Mtrs">Mtrs</option>
                 <option value="Assy">Assy</option>
+                <option value="ltr">ltr</option>
+                <option value="gal">gal</option>
               </select>
             </div>
             <div>
