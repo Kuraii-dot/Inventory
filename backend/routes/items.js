@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { logCreate, logUpdate, logDelete } from '../middleware/activityLogger.js';
 import {
   getItems, getAllItemsOverview, getItemsByCategory, getItemsByClassification,
-  addItem, getItemById, updateItem, deleteItem, validateStock
+  addItem, getItemById, updateItem, deleteItem, restoreItem, validateStock
 } from '../controllers/itemsController.js';
 
 const router = Router();
@@ -19,5 +19,6 @@ router.post('/', logCreate('items', (req, data) => `Added item: ${req.body.name}
 router.get('/:id',                getItemById);
 router.put('/:id', logUpdate('items', (req) => `Updated item ID: ${req.params.id}`), updateItem);
 router.delete('/:id', logDelete('items', (req) => `Deleted item ID: ${req.params.id}`), deleteItem);
+router.put('/:id/restore', restoreItem);
 
 export default router;

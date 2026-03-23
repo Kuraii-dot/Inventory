@@ -28,3 +28,5 @@ export const deleteCategory   = (id)       => client.delete(`/categories/${id}`)
 // frontend/src/api/classifications.js
 export const fetchClassifications = (category_id) => client.get('/classifications', { params: category_id ? { category_id } : {} }).then(r => r.data);
 export const createClassification = (category_id, classification_name) => client.post('/classifications', { category_id, classification_name }).then(r => r.data);
+
+export const restoreItem = (id) => client.put(`/items/${id}/restore`).then(r => r.data);

@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { fetchItems, deleteItem, fetchClassifications } from '../api/items.js';
+import { fetchItems, deleteItem, restoreItem, fetchClassifications } from '../api/items.js';
 import { fetchCategories }              from '../api/items.js';
 import { fetchSuppliers }              from '../api/items.js';
 import { useToast, ToastContainer }     from '../hooks/useToast.jsx';
@@ -35,8 +35,8 @@ function buildYears() {
 
 // ─── component ──────────────────────────────────────────────────────────────
 export default function Items() {
-  const { user } = useAuth();
-  const { toasts, showToast } = useToast();
+const { user, hasRole } = useAuth();
+const { toasts, showToast } = useToast();
 
   // ── data state ──────────────────────────────────────────────────────────
   const [items,           setItems]           = useState([]);
@@ -52,6 +52,11 @@ export default function Items() {
     date_from: '', date_to: '',
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [page,         setPage]         = useState(1);
+  const [deactivated,  setDeactivated]  = useState([]);
+  const [showDeactivated, setShowDeactivated] = useState(false);
+  const [totalPages,   setTotalPages]   = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // ── modal visibility state ───────────────────────────────────────────────
   const [showAddItem,       setShowAddItem]       = useState(false);
@@ -61,11 +66,19 @@ export default function Items() {
   const [showClassificationModal, setShowClassificationModal] = useState(false);
 
   // ── load items ───────────────────────────────────────────────────────────
-  const loadItems = useCallback(async (params = appliedFilters) => {
+  const loadItems = useCallback(async (params = appliedFilters, pg = page) => {
     setLoading(true);
     try {
-      const data = await fetchItems(params);
-      setItems(data);
+      const data = await fetchItems({ ...params, page: pg, limit: 15 });
+      // Handle both paginated and non-paginated responses
+      if (data.data) {
+        setItems(data.data);
+        setTotalPages(data.total_pages ?? 1);
+        setTotalRecords(data.total_records ?? 0);
+        setPage(pg);
+      } else {
+        setItems(data);
+      }
     } catch (err) {
       showToast('Error loading items.', 'error');
     } finally {
@@ -74,13 +87,24 @@ export default function Items() {
   }, [appliedFilters]);
 
   // ── load dropdowns ───────────────────────────────────────────────────────
+  async function loadDeactivated() {
+    if (!hasRole('master_admin')) return;
+    try {
+      // Fetch inactive items directly
+      const { data } = await import('../api/client.js').then(m =>
+        m.default.get('/items', { params: { is_active: 'false', limit: 100 } })
+      );
+      setDeactivated(data.data ?? []);
+    } catch { /* silent */ }
+  }
+
   const loadDropdowns = useCallback(async () => {
     const [cats, sups] = await Promise.all([fetchCategories(), fetchSuppliers()]);
     setCategories(cats);
     setSuppliers(sups);
   }, []);
 
-  useEffect(() => { loadItems(); loadDropdowns(); }, []);
+  useEffect(() => { loadItems(); loadDropdowns(); loadDeactivated(); }, []);
 
   // ── filter form handlers ─────────────────────────────────────────────────
   async function handleFilterChange(e) {
@@ -101,25 +125,43 @@ export default function Items() {
   function handleApplyFilters(e) {
     e.preventDefault();
     setAppliedFilters(filters);
-    loadItems(filters);
+    loadItems(filters, 1);
   }
 
   function handleReset() {
     const empty = { search: '', category_id: '', classification_id: '', filter_month: '', filter_year: '', date_from: '', date_to: '' };
     setFilters(empty);
     setAppliedFilters(empty);
-    loadItems(empty);
+    setPage(1);
+    loadItems(empty, 1);
   }
 
   // ── delete item — mirrors: deleteItem() in items.js ─────────────────────
-  async function handleDelete(id) {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+  async function handleDelete(id, name) {
+    if (!hasRole('master_admin')) {
+      showToast('Only Master Admin can deactivate items.', 'error');
+      return;
+    }
+    if (!confirm(`Deactivate "${name}"? All historical data will be preserved.`)) return;
     try {
-      await deleteItem(id);
-      showToast('Item deleted successfully!', 'success');
+      const result = await deleteItem(id);
+      showToast(`✅ ${result.message}`, 'success');
       loadItems();
+      loadDeactivated();
     } catch (err) {
-      showToast('Error deleting item.', 'error');
+      showToast(err.response?.data?.message || 'Error deactivating item.', 'error');
+    }
+  }
+
+  async function handleRestore(id, name) {
+    if (!confirm(`Restore "${name}"?`)) return;
+    try {
+      const result = await restoreItem(id);
+      showToast(`✅ ${result.message}`, 'success');
+      loadItems();
+      loadDeactivated();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error restoring item.', 'error');
     }
   }
 
@@ -131,7 +173,7 @@ export default function Items() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <div className="max-w-[1500px] mx-auto px-8 py-8">
+      <div className="max-w-screen-xl mx-auto px-8 py-8">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex justify-between items-start mb-8">
@@ -262,6 +304,13 @@ export default function Items() {
           </form>
         </div>
 
+        {/* Record count */}
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm text-slate-500">
+            {loading ? 'Loading...' : `${totalRecords} item${totalRecords !== 1 ? 's' : ''} found`}
+          </span>
+        </div>
+
         {/* ── Items Table ─────────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
           <div className="overflow-x-auto">
@@ -344,7 +393,7 @@ export default function Items() {
                           className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
                           ✏️ Edit
                         </button>
-                        <button onClick={() => handleDelete(item.id)}
+                        <button onClick={() => handleDelete(item.id, item.name)}
                           className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium">
                           🗑️ Delete
                         </button>
@@ -354,10 +403,44 @@ export default function Items() {
                 ))}
               </tbody>
             </table>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-blue-100 px-6 py-4 mt-4 flex items-center justify-between">
+              <span className="text-sm text-slate-600">
+                Page {page} of {totalPages} — {totalRecords} total items
+              </span>
+              <div className="flex gap-2">
+                <button disabled={page <= 1}
+                  onClick={() => loadItems(appliedFilters, page - 1)}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm">
+                  ← Previous
+                </button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const pg = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
+                  return (
+                    <button key={pg} onClick={() => loadItems(appliedFilters, pg)}
+                      className={`px-4 py-2 rounded-lg text-sm border ${
+                        pg === page
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                      }`}>
+                      {pg}
+                    </button>
+                  );
+                })}
+                <button disabled={page >= totalPages}
+                  onClick={() => loadItems(appliedFilters, page + 1)}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm">
+                  Next →
+                </button>
+              </div>
+            </div>
+          )}
           </div>
         </div>
-
       </div>
+
+      
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
       <AddItemModal
@@ -400,6 +483,49 @@ export default function Items() {
         categories={categories}
         showToast={showToast}
       />
+
+      {/* ── Deactivated Items — master_admin only ─────────────────────── */}
+      {hasRole('master_admin') && (
+        <div className="max-w-screen-xl mx-auto px-8 pb-8">
+          <button onClick={() => setShowDeactivated(v => !v)}
+            className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium mb-3">
+            <span>{showDeactivated ? '⮟' : '⮞'}</span>
+            <span>Deactivated Items ({deactivated.length})</span>
+          </button>
+          {showDeactivated && deactivated.length > 0 && (
+            <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-200 text-slate-600 text-xs uppercase">
+                    {['Item Name','Category','Quantity','Unit Price','Action'].map(h => (
+                      <th key={h} className="py-3 px-4 text-left font-semibold">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {deactivated.map(item => (
+                    <tr key={item.id} className="opacity-60 hover:opacity-80 transition-opacity">
+                      <td className="py-3 px-4 text-sm line-through text-slate-500">{item.name}</td>
+                      <td className="py-3 px-4 text-sm text-slate-500">{item.category_name}</td>
+                      <td className="py-3 px-4 text-sm text-slate-500">{item.quantity}</td>
+                      <td className="py-3 px-4 text-sm text-slate-500">₱{parseFloat(item.unit_price).toFixed(2)}</td>
+                      <td className="py-3 px-4">
+                        <button onClick={() => handleRestore(item.id, item.name)}
+                          className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 text-xs font-medium">
+                          ♻️ Restore
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {showDeactivated && deactivated.length === 0 && (
+            <p className="text-slate-400 text-sm">No deactivated items.</p>
+          )}
+        </div>
+      )}
 
       <ToastContainer toasts={toasts} />
     </div>

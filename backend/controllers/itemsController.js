@@ -11,10 +11,9 @@ import pool from '../db/pool.js';
 // ─────────────────────────────────────────────
 // GET /api/items
 // Converted from: items.php main SELECT query
-// PHP: $_GET['search'], ['category_id'], ['classification_id'], ['filter_month'], ['filter_year']
 // ─────────────────────────────────────────────
 export async function getItems(req, res) {
-  const { search, category_id, classification_id, filter_month, filter_year, date_from, date_to } = req.query;
+  const { search, category_id, classification_id, filter_month, filter_year, date_from, date_to, is_active } = req.query;
 
   let query = `
     SELECT
@@ -77,11 +76,38 @@ export async function getItems(req, res) {
     params.push(date_to);
   }
 
-  query += ' ORDER BY i.id DESC';
+  // is_active filter
+  if (is_active === 'false') {
+    query += ' AND i.is_active = false';
+  } else {
+    query += ' AND i.is_active = true';
+  }
+
+  const page   = parseInt(req.query.page)  || 1;
+  const limit  = parseInt(req.query.limit) || 15;
+  const offset = (page - 1) * limit;
+
+  // Count query before adding ORDER BY and LIMIT
+  const countQuery = `SELECT COUNT(*) FROM (${query}) AS c`;
+
+  // Now add ORDER BY + pagination params
+  query += ` ORDER BY i.id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+  params.push(limit, offset);
 
   try {
-    const result = await pool.query(query, params);
-    res.json(result.rows);
+    const [result, countResult] = await Promise.all([
+      pool.query(query, params),
+      pool.query(countQuery, params.slice(0, -2)),
+    ]);
+
+    const total_records = parseInt(countResult.rows[0].count);
+    res.json({
+      data:        result.rows,
+      total_records,
+      total_pages: Math.ceil(total_records / limit),
+      page,
+      limit,
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching items: ' + err.message });
   }
@@ -89,7 +115,6 @@ export async function getItems(req, res) {
 
 // ─────────────────────────────────────────────
 // GET /api/items/all-overview
-// Converted from: allitems.php main aggregation query
 // Groups items by name, calculates usage rate, distribution totals
 // ─────────────────────────────────────────────
 export async function getAllItemsOverview(req, res) {
@@ -118,7 +143,6 @@ export async function getAllItemsOverview(req, res) {
 
 // ─────────────────────────────────────────────
 // GET /api/items/by-category?category_id=X
-// Converted from: actions/fetch_items.php + pages/forms/fetch_items_by_category.php
 // ─────────────────────────────────────────────
 export async function getItemsByCategory(req, res) {
   const { category_id } = req.query;
@@ -141,7 +165,6 @@ export async function getItemsByCategory(req, res) {
 
 // ─────────────────────────────────────────────
 // GET /api/items/by-classification?classification_id=X
-// Converted from: pages/forms/fetch_items_by_classification.php
 // ─────────────────────────────────────────────
 export async function getItemsByClassification(req, res) {
   const { classification_id } = req.query;
@@ -165,7 +188,6 @@ export async function getItemsByClassification(req, res) {
 // ─────────────────────────────────────────────
 // POST /api/items
 // Converted from: items.php POST add_item handler
-// PHP: INSERT INTO items (...) VALUES (...)
 // ─────────────────────────────────────────────
 export async function addItem(req, res) {
   const {
@@ -202,7 +224,6 @@ export async function addItem(req, res) {
 // ─────────────────────────────────────────────
 // GET /api/items/:id
 // Fetch single item for edit modal
-// Converted from: pages/forms/edit_item.php GET handler
 // ─────────────────────────────────────────────
 export async function getItemById(req, res) {
   const { id } = req.params;
@@ -219,7 +240,6 @@ export async function getItemById(req, res) {
 // ─────────────────────────────────────────────
 // PUT /api/items/:id
 // Converted from: actions/edit_item.php
-// PHP: UPDATE items SET name=:name, category_id=:category_id ...
 // ─────────────────────────────────────────────
 export async function updateItem(req, res) {
   const { id } = req.params;
@@ -250,24 +270,62 @@ export async function updateItem(req, res) {
 // ─────────────────────────────────────────────
 // DELETE /api/items/:id
 // Converted from: actions/delete_items.php
-// PHP: DELETE FROM items WHERE id = :id
 // ─────────────────────────────────────────────
 export async function deleteItem(req, res) {
   const { id } = req.params;
-
-  if (!id || isNaN(id)) {
+  if (!id || isNaN(id))
     return res.status(400).json({ success: false, message: 'Invalid item ID.' });
+
+  // Only master_admin can deactivate items
+  if (req.user?.role !== 'master_admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Only Master Admin can deactivate items.',
+    });
   }
 
   try {
-    // mirrors: check if item exists first
-    const check = await pool.query('SELECT id FROM items WHERE id = $1', [id]);
-    if (!check.rows[0]) {
+    const check = await pool.query('SELECT id, name FROM items WHERE id = $1', [id]);
+    if (!check.rows[0])
       return res.status(404).json({ success: false, message: 'Item not found.' });
-    }
 
-    await pool.query('DELETE FROM items WHERE id = $1', [id]);
-    res.json({ success: true, message: 'Item deleted successfully.' });
+    // Count linked records for info message
+    const [distCheck, allocCheck] = await Promise.all([
+      pool.query('SELECT COUNT(*) FROM distributions WHERE item_id = $1', [id]),
+      pool.query("SELECT COUNT(*) FROM allocations WHERE item_id = $1 AND status != 'deleted'", [id]),
+    ]);
+    const distCount  = parseInt(distCheck.rows[0].count);
+    const allocCount = parseInt(allocCheck.rows[0].count);
+
+    // Soft delete — preserve all historical data
+    await pool.query('UPDATE items SET is_active = false WHERE id = $1', [id]);
+
+    res.json({
+      success: true,
+      message: `"${check.rows[0].name}" deactivated. ${distCount + allocCount > 0
+        ? `${distCount} distribution(s) and ${allocCount} allocation(s) are preserved.`
+        : ''}`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Database error: ' + err.message });
+  }
+}
+
+// ─────────────────────────────────────────────
+// PUT /api/items/:id/restore — master_admin only
+// ─────────────────────────────────────────────
+export async function restoreItem(req, res) {
+  const { id } = req.params;
+  if (req.user?.role !== 'master_admin')
+    return res.status(403).json({ success: false, message: 'Only Master Admin can restore items.' });
+
+  try {
+    const check = await pool.query('SELECT id, name FROM items WHERE id = $1', [id]);
+    if (!check.rows[0])
+      return res.status(404).json({ success: false, message: 'Item not found.' });
+
+    await pool.query('UPDATE items SET is_active = true WHERE id = $1', [id]);
+    res.json({ success: true, message: `"${check.rows[0].name}" restored successfully.` });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message });
   }
@@ -276,7 +334,6 @@ export async function deleteItem(req, res) {
 // ─────────────────────────────────────────────
 // GET /api/items/validate-stock?item_id=X&quantity=Y
 // Converted from: actions/validate_stock.php
-// PHP: compare requested qty vs items.quantity
 // ─────────────────────────────────────────────
 export async function validateStock(req, res) {
   const { item_id, quantity } = req.query;
