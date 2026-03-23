@@ -8,10 +8,12 @@ import Modal from '../Modal.jsx';
 import { createItem } from '../../api/items.js';
 import { fetchClassifications } from '../../api/items.js';
 
+const today = new Date().toISOString().split('T')[0];
+
 export default function AddItemModal({ open, onClose, categories, suppliers, onSuccess }) {
   const [form, setForm] = useState({
     name: '', category_id: '', classification_id: '', supplier_id: '',
-    quantity: '', unit_price: '', unit: 'Pcs', date_ordered: '', date_procured: '', notes: ''
+    quantity: '', unit_price: '', unit: 'Pcs', date_ordered: today, date_procured: today, notes: ''
   });
   const [classifications, setClassifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +43,7 @@ export default function AddItemModal({ open, onClose, categories, suppliers, onS
       onClose();
       setForm({
         name: '', category_id: '', classification_id: '', supplier_id: '',
-        quantity: '', unit_price: '', unit: 'Pcs', date_ordered: '', date_procured: '', notes: ''
+        quantity: '', unit_price: '', unit: 'Pcs', date_ordered: today, date_procured: today, notes: ''
       });
     } catch (err) {
       onSuccess(err.response?.data?.message || 'Error adding item.', 'error');
