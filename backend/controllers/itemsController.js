@@ -11,6 +11,7 @@ import pool from '../db/pool.js';
 // ─────────────────────────────────────────────
 // GET /api/items
 // Converted from: items.php main SELECT query
+// PHP: $_GET['search'], ['category_id'], ['classification_id'], ['filter_month'], ['filter_year']
 // ─────────────────────────────────────────────
 export async function getItems(req, res) {
   const { search, category_id, classification_id, filter_month, filter_year, date_from, date_to, is_active } = req.query;
@@ -21,6 +22,7 @@ export async function getItems(req, res) {
       i.name,
       i.quantity,
       i.unit_price,
+      i.unit,
       i.date_ordered,
       i.date_procured,
       c.name  AS category,
@@ -97,7 +99,7 @@ export async function getItems(req, res) {
   try {
     const [result, countResult] = await Promise.all([
       pool.query(query, params),
-      pool.query(countQuery, params.slice(0, -2)),
+      pool.query(countQuery, params.slice(0, -2)), // exclude limit/offset from count
     ]);
 
     const total_records = parseInt(countResult.rows[0].count);
@@ -115,6 +117,7 @@ export async function getItems(req, res) {
 
 // ─────────────────────────────────────────────
 // GET /api/items/all-overview
+// Converted from: allitems.php main aggregation query
 // Groups items by name, calculates usage rate, distribution totals
 // ─────────────────────────────────────────────
 export async function getAllItemsOverview(req, res) {
@@ -143,6 +146,7 @@ export async function getAllItemsOverview(req, res) {
 
 // ─────────────────────────────────────────────
 // GET /api/items/by-category?category_id=X
+// Converted from: actions/fetch_items.php + pages/forms/fetch_items_by_category.php
 // ─────────────────────────────────────────────
 export async function getItemsByCategory(req, res) {
   const { category_id } = req.query;
@@ -165,6 +169,7 @@ export async function getItemsByCategory(req, res) {
 
 // ─────────────────────────────────────────────
 // GET /api/items/by-classification?classification_id=X
+// Converted from: pages/forms/fetch_items_by_classification.php
 // ─────────────────────────────────────────────
 export async function getItemsByClassification(req, res) {
   const { classification_id } = req.query;
@@ -188,11 +193,12 @@ export async function getItemsByClassification(req, res) {
 // ─────────────────────────────────────────────
 // POST /api/items
 // Converted from: items.php POST add_item handler
+// PHP: INSERT INTO items (...) VALUES (...)
 // ─────────────────────────────────────────────
 export async function addItem(req, res) {
   const {
     name, category_id, classification_id, supplier_id,
-    quantity, unit_price, date_ordered, date_procured
+    quantity, unit_price, unit, date_ordered, date_procured
   } = req.body;
 
   if (!name || !category_id || !supplier_id || !quantity || !unit_price || !date_ordered || !date_procured) {
@@ -202,8 +208,8 @@ export async function addItem(req, res) {
   try {
     await pool.query(
       `INSERT INTO items
-         (name, category_id, classification_id, supplier_id, quantity, unit_price, date_ordered, date_procured)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         (name, category_id, classification_id, supplier_id, quantity, unit_price, unit, date_ordered, date_procured)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         name,
         category_id,
@@ -211,6 +217,7 @@ export async function addItem(req, res) {
         supplier_id,
         quantity,
         unit_price,
+        unit || 'Pcs',
         date_ordered,
         date_procured,
       ]
@@ -224,6 +231,7 @@ export async function addItem(req, res) {
 // ─────────────────────────────────────────────
 // GET /api/items/:id
 // Fetch single item for edit modal
+// Converted from: pages/forms/edit_item.php GET handler
 // ─────────────────────────────────────────────
 export async function getItemById(req, res) {
   const { id } = req.params;
@@ -240,10 +248,11 @@ export async function getItemById(req, res) {
 // ─────────────────────────────────────────────
 // PUT /api/items/:id
 // Converted from: actions/edit_item.php
+// PHP: UPDATE items SET name=:name, category_id=:category_id ...
 // ─────────────────────────────────────────────
 export async function updateItem(req, res) {
   const { id } = req.params;
-  const { name, category_id, classification_id, supplier_id, quantity, unit_price } = req.body;
+  const { name, category_id, classification_id, supplier_id, quantity, unit_price, unit } = req.body;
 
   if (!name || !category_id || !supplier_id) {
     return res.status(400).json({ success: false, message: 'Please fill out all required fields.' });
@@ -257,9 +266,10 @@ export async function updateItem(req, res) {
          classification_id = $3,
          supplier_id       = $4,
          quantity          = $5,
-         unit_price        = $6
-       WHERE id = $7`,
-      [name, category_id, classification_id || null, supplier_id, quantity, unit_price, id]
+         unit_price        = $6,
+         unit              = $7
+       WHERE id = $8`,
+      [name, category_id, classification_id || null, supplier_id, quantity, unit_price, unit || 'Pcs', id]
     );
     res.json({ success: true, message: 'Item updated successfully!' });
   } catch (err) {
@@ -270,6 +280,7 @@ export async function updateItem(req, res) {
 // ─────────────────────────────────────────────
 // DELETE /api/items/:id
 // Converted from: actions/delete_items.php
+// PHP: DELETE FROM items WHERE id = :id
 // ─────────────────────────────────────────────
 export async function deleteItem(req, res) {
   const { id } = req.params;
@@ -334,6 +345,7 @@ export async function restoreItem(req, res) {
 // ─────────────────────────────────────────────
 // GET /api/items/validate-stock?item_id=X&quantity=Y
 // Converted from: actions/validate_stock.php
+// PHP: compare requested qty vs items.quantity
 // ─────────────────────────────────────────────
 export async function validateStock(req, res) {
   const { item_id, quantity } = req.query;

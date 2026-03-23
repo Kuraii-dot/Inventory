@@ -15,7 +15,7 @@ import { fetchClassifications } from '../../api/items.js';
 export default function EditItemModal({ itemId, open, onClose, categories, suppliers, onSuccess }) {
   const [form, setForm] = useState({
     name: '', category_id: '', classification_id: '',
-    supplier_id: '', quantity: '', unit_price: ''
+    supplier_id: '', quantity: '', unit_price: '', unit: 'Pcs'
   });
   const [classifications, setClassifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,6 +34,7 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
           supplier_id:       item.supplier_id        ?? '',
           quantity:          item.quantity,
           unit_price:        item.unit_price,
+          unit:              item.unit || 'Pcs',
         });
       })
       .catch(console.error)
@@ -106,10 +107,20 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Quantity</label>
               <input type="number" name="quantity" required min="0" value={form.quantity} onChange={handleChange} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Unit *</label>
+              <select name="unit" required value={form.unit} onChange={handleChange} className={inputCls}>
+                <option value="Pc">Pc</option>
+                <option value="Pcs">Pcs</option>
+                <option value="Mtr">Mtr</option>
+                <option value="Mtrs">Mtrs</option>
+                <option value="Assy">Assy</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Unit Price (₱)</label>

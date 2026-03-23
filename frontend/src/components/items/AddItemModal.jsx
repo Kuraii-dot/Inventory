@@ -11,7 +11,7 @@ import { fetchClassifications } from '../../api/items.js';
 export default function AddItemModal({ open, onClose, categories, suppliers, onSuccess }) {
   const [form, setForm] = useState({
     name: '', category_id: '', classification_id: '', supplier_id: '',
-    quantity: '', unit_price: '', date_ordered: '', date_procured: '', notes: ''
+    quantity: '', unit_price: '', unit: 'Pcs', date_ordered: '', date_procured: '', notes: ''
   });
   const [classifications, setClassifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ export default function AddItemModal({ open, onClose, categories, suppliers, onS
       onClose();
       setForm({
         name: '', category_id: '', classification_id: '', supplier_id: '',
-        quantity: '', unit_price: '', date_ordered: '', date_procured: '', notes: ''
+        quantity: '', unit_price: '', unit: 'Pcs', date_ordered: '', date_procured: '', notes: ''
       });
     } catch (err) {
       onSuccess(err.response?.data?.message || 'Error adding item.', 'error');
@@ -91,11 +91,21 @@ export default function AddItemModal({ open, onClose, categories, suppliers, onS
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Quantity *</label>
             <input type="number" name="quantity" required min="1" value={form.quantity} onChange={handleChange}
               className={inputCls} placeholder="0" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Unit *</label>
+            <select name="unit" required value={form.unit} onChange={handleChange} className={inputCls}>
+              <option value="Pc">Pc</option>
+              <option value="Pcs">Pcs</option>
+              <option value="Mtr">Mtr</option>
+              <option value="Mtrs">Mtrs</option>
+              <option value="Assy">Assy</option>
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Unit Price (₱) *</label>
