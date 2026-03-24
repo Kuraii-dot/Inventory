@@ -51,9 +51,8 @@ export default function AllItems() {
   const [clsOptions,  setClsOptions]  = useState([]);
   const [itemOptions, setItemOptions] = useState([]);
 
-  // Sort state
-  const [sortField, setSortField] = useState('item_name');
-  const [sortDir,   setSortDir]   = useState('asc');
+  // Per-group sort state: { [catName]: { field, dir } }
+  const [groupSort, setGroupSort] = useState({});
 
   // Inventory preview state
   const [invPreview,        setInvPreview]        = useState(null);
@@ -88,22 +87,28 @@ export default function AllItems() {
           (i.category_name ?? '').toLowerCase().includes(search.toLowerCase()))
       : items;
 
-    const sorted = [...filtered].sort((a, b) => {
-      let av = a[sortField] ?? '';
-      let bv = b[sortField] ?? '';
-      if (typeof av === 'string') av = av.toLowerCase();
-      if (typeof bv === 'string') bv = bv.toLowerCase();
-      if (av < bv) return sortDir === 'asc' ? -1 : 1;
-      if (av > bv) return sortDir === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return sorted.reduce((acc, row) => {
+    const groups = filtered.reduce((acc, row) => {
       const cat = row.category_name ?? 'Uncategorized';
       (acc[cat] ??= []).push(row);
       return acc;
     }, {});
-  }, [items, search, sortField, sortDir]);
+
+    // Apply per-group sort
+    Object.keys(groups).forEach(cat => {
+      const sort = groupSort[cat];
+      if (sort) {
+        groups[cat] = [...groups[cat]].sort((a, b) => {
+          const av = (a.item_name ?? '').toLowerCase();
+          const bv = (b.item_name ?? '').toLowerCase();
+          if (av < bv) return sort.dir === 'asc' ? -1 : 1;
+          if (av > bv) return sort.dir === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+    });
+
+    return groups;
+  }, [items, search, groupSort]);
 
   // ── Stats ─────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -208,14 +213,18 @@ export default function AllItems() {
     finally { setInvRptLoading(false); }
   }
 
-  function toggleSort(field) {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('asc'); }
+  function toggleGroupSort(catName) {
+    setGroupSort(prev => {
+      const cur = prev[catName];
+      if (!cur || cur.dir === 'desc') return { ...prev, [catName]: { dir: 'asc' } };
+      return { ...prev, [catName]: { dir: 'desc' } };
+    });
   }
 
-  function sortIcon(field) {
-    if (sortField !== field) return '↕️';
-    return sortDir === 'asc' ? '↑' : '↓';
+  function groupSortIcon(catName) {
+    const sort = groupSort[catName];
+    if (!sort) return 'A→Z';
+    return sort.dir === 'asc' ? 'A→Z ↑' : 'Z→A ↓';
   }
 
   const selectCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition";
@@ -289,19 +298,8 @@ export default function AllItems() {
           <table style={{ minWidth: "1200px" }} className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-amber-300 to-sky-600 text-white">
-                {[
-                  { label: '#',                    field: null              },
-                  { label: 'Item Name',            field: 'item_name'       },
-                  { label: 'Category',             field: 'category_name'   },
-                  { label: 'Total Stock',          field: 'total_stock'     },
-                  { label: 'All-Time Distributed', field: 'total_distributed'},
-                  { label: 'Usage Rate',           field: null              },
-                ].map(({ label, field }) => (
-                  <th key={label}
-                    onClick={() => field && toggleSort(field)}
-                    className={`py-4 px-6 text-center text-xs font-semibold uppercase tracking-wider ${field ? 'cursor-pointer hover:bg-white/10 select-none' : ''}`}>
-                    {label} {field ? sortIcon(field) : ''}
-                  </th>
+                {['#', 'Item Name', 'Category', 'Total Stock', 'All-Time Distributed', 'Usage Rate'].map(h => (
+                  <th key={h} className="py-4 px-6 text-center text-xs font-semibold uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -335,7 +333,7 @@ export default function AllItems() {
                           ⮞
                         </span>
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sky-700">📦 {catName}</span>
                             <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-medium">
                               {catItems.length} item{catItems.length !== 1 ? 's' : ''}
@@ -346,6 +344,13 @@ export default function AllItems() {
                             <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
                               Distributed: {catDist.toLocaleString()}
                             </span>
+                            {isOpen && (
+                              <button
+                                onClick={e => { e.stopPropagation(); toggleGroupSort(catName); }}
+                                className="px-2 py-0.5 bg-white border border-amber-300 text-amber-700 rounded-full text-xs font-medium hover:bg-amber-50 transition-colors">
+                                🔤 {groupSortIcon(catName)}
+                              </button>
+                            )}
                           </div>
                           <p className="text-xs text-slate-500 mt-1">Click to expand / collapse</p>
                         </div>
@@ -413,7 +418,6 @@ export default function AllItems() {
             { bg: 'bg-emerald-100', icon: '📊', label: 'Low Usage',         val: stats.low,      cls: 'text-emerald-600' },
             { bg: 'bg-amber-100',   icon: '📈', label: 'Moderate Usage',    val: stats.moderate, cls: 'text-amber-600'   },
             { bg: 'bg-red-100',     icon: '🔥', label: 'High Usage',        val: stats.high,     cls: 'text-red-600'     },
-            { bg: 'bg-indigo-100',  icon: '🔀', label: 'Multiple Variants', val: stats.variants, cls: 'text-indigo-600'  },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
               <div className="flex items-center gap-4">
@@ -427,6 +431,33 @@ export default function AllItems() {
               </div>
             </div>
           ))}
+
+          {/* Multiple Variants — same size card with simple hover */}
+          <div className="relative bg-white rounded-xl shadow-sm border border-slate-100 p-6 group">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <span className="text-2xl">🔀</span>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Multiple Variants</p>
+                <p className="text-2xl font-bold text-indigo-600">{stats.variants}</p>
+              </div>
+            </div>
+            {stats.variants > 0 && (
+              <div className="absolute bottom-full left-0 mb-2 w-64 bg-white border border-indigo-200 rounded-xl shadow-xl p-3 z-20 hidden group-hover:block">
+                <p className="font-semibold text-slate-700 text-xs mb-2">Items with multiple variants:</p>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {items.filter(i => i.variant_count > 1).map((i, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                      <span className="text-slate-700 truncate flex-1">{i.item_name}</span>
+                      <span className="ml-2 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full flex-shrink-0">{i.variant_count}x</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
 
       </div>

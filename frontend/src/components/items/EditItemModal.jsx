@@ -15,7 +15,7 @@ import { fetchClassifications } from '../../api/items.js';
 export default function EditItemModal({ itemId, open, onClose, categories, suppliers, onSuccess }) {
   const [form, setForm] = useState({
     name: '', category_id: '', classification_id: '',
-    supplier_id: '', quantity: '', unit_price: '', unit: 'Pcs'
+    supplier_id: '', quantity: '', unit_price: '', unit: 'Pcs', sku: ''
   });
   const [classifications, setClassifications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +35,7 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
           quantity:          item.quantity,
           unit_price:        item.unit_price,
           unit:              item.unit || 'Pcs',
+          sku:               item.sku  || '',
         });
       })
       .catch(console.error)
@@ -113,16 +114,39 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
               <input type="number" name="quantity" required min="0" value={form.quantity} onChange={handleChange} className={inputCls} />
             </div>
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Item Code <span className="font-normal text-slate-400 text-xs">(leave blank to keep existing)</span>
+              </label>
+              <div className="flex gap-2">
+                <input type="text" name="sku" value={form.sku} onChange={handleChange}
+                  placeholder="e.g. 36-14-52"
+                  className={`${inputCls} flex-1`} />
+                <button type="button"
+                  onClick={() => {
+                    if (form.category_id) {
+                      setForm(f => ({ ...f, sku: `${f.category_id}-${f.classification_id || '00'}-` }));
+                    }
+                  }}
+                  title="Auto-fill category-classification prefix"
+                  className="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-xs font-medium whitespace-nowrap">
+                  🔧 Auto
+                </button>
+              </div>
+              {form.category_id && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Suggested: {form.category_id}-{form.classification_id || '00'}-[item ID]
+                </p>
+              )}
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Unit *</label>
               <select name="unit" required value={form.unit} onChange={handleChange} className={inputCls}>
                 <option value="Pc">Pc</option>
-                <option value="Set">Set</option>
                 <option value="Pcs">Pcs</option>
+                <option value="Set">Set</option>
                 <option value="Mtr">Mtr</option>
                 <option value="Mtrs">Mtrs</option>
                 <option value="Assy">Assy</option>
-                <option value="ltr">ltr</option>
-                <option value="gal">gal</option>
               </select>
             </div>
             <div>

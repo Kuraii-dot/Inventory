@@ -254,7 +254,7 @@ export async function getItemById(req, res) {
 // ─────────────────────────────────────────────
 export async function updateItem(req, res) {
   const { id } = req.params;
-  const { name, category_id, classification_id, supplier_id, quantity, unit_price, unit } = req.body;
+  const { name, category_id, classification_id, supplier_id, quantity, unit_price, unit, sku } = req.body;
 
   if (!name || !category_id || !supplier_id) {
     return res.status(400).json({ success: false, message: 'Please fill out all required fields.' });
