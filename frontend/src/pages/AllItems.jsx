@@ -32,7 +32,10 @@ export default function AllItems() {
   const [expanded,   setExpanded]   = useState({});
 
   // Modal visibility
-  const [showReport,     setShowReport]     = useState(false);
+  const [showReport,       setShowReport]       = useState(false);
+  const [showInventoryRpt, setShowInventoryRpt] = useState(false);
+  const [invRptLoading,    setInvRptLoading]    = useState(false);
+  const [invRptFormat,     setInvRptFormat]     = useState('pdf');
   const [showDepartment, setShowDepartment] = useState(false);
   const [showLedger,     setShowLedger]     = useState(false);
 
@@ -47,6 +50,19 @@ export default function AllItems() {
   const [ledgerItem,  setLedgerItem]  = useState('');
   const [clsOptions,  setClsOptions]  = useState([]);
   const [itemOptions, setItemOptions] = useState([]);
+
+  // Sort state
+  const [sortField, setSortField] = useState('item_name');
+  const [sortDir,   setSortDir]   = useState('asc');
+
+  // Inventory preview state
+  const [invPreview,        setInvPreview]        = useState(null);
+  const [invPreviewLoading, setInvPreviewLoading] = useState(false);
+  const [invPreviewError,   setInvPreviewError]   = useState('');
+  const [invDateFrom,       setInvDateFrom]       = useState('');
+  const [invDateTo,         setInvDateTo]         = useState('');
+  const [invFilterType,     setInvFilterType]     = useState('all');
+  const [invExporting,      setInvExporting]      = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -72,12 +88,22 @@ export default function AllItems() {
           (i.category_name ?? '').toLowerCase().includes(search.toLowerCase()))
       : items;
 
-    return filtered.reduce((acc, row) => {
+    const sorted = [...filtered].sort((a, b) => {
+      let av = a[sortField] ?? '';
+      let bv = b[sortField] ?? '';
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted.reduce((acc, row) => {
       const cat = row.category_name ?? 'Uncategorized';
       (acc[cat] ??= []).push(row);
       return acc;
     }, {});
-  }, [items, search]);
+  }, [items, search, sortField, sortDir]);
 
   // ── Stats ─────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -117,11 +143,86 @@ export default function AllItems() {
     setItemOptions(data);
   }
 
+  // ── Inventory Preview ────────────────────────────────────
+  function buildInvParams() {
+    const params = {};
+    if (invFilterType === 'category'       && ledgerCat) params.category_id       = ledgerCat;
+    if (invFilterType === 'classification' && ledgerCls) params.classification_id = ledgerCls;
+    if (invFilterType === 'period') {
+      if (invDateFrom) params.date_from = invDateFrom;
+      if (invDateTo)   params.date_to   = invDateTo;
+    }
+    if (invFilterType === 'month') {
+      const now = new Date();
+      params.date_from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      params.date_to   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    }
+    return params;
+  }
+
+  async function loadInvPreview() {
+    setInvPreviewLoading(true);
+    setInvPreviewError('');
+    setInvPreview(null);
+    try {
+      const params = buildInvParams();
+      const res = await client.get('/reports/inventory-preview', { params });
+      setInvPreview(res.data ?? []);
+    } catch {
+      setInvPreviewError('Failed to load preview.');
+    } finally {
+      setInvPreviewLoading(false);
+    }
+  }
+
+  async function handleInvExport(format) {
+    setInvExporting(true);
+    try {
+      const params = { ...buildInvParams(), format };
+      const { data } = await client.get('/reports/inventory', { params, responseType: 'blob' });
+      const mime = format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const ext  = format === 'pdf' ? 'pdf' : 'xlsx';
+      const url  = URL.createObjectURL(new Blob([data], { type: mime }));
+      const a    = document.createElement('a');
+      a.href = url; a.download = `inventory_report.${ext}`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch { showToast('Export failed.', 'error'); }
+    finally { setInvExporting(false); }
+  }
+
+  async function handleInventoryReport(format) {
+    setInvRptLoading(true);
+    try {
+      const { data } = await client.get(`/reports/inventory?format=${format}`, { responseType: 'blob' });
+      const mime = format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      const ext  = format === 'pdf' ? 'pdf' : 'xlsx';
+      const url  = URL.createObjectURL(new Blob([data], { type: mime }));
+      const a    = document.createElement('a');
+      a.href = url; a.download = `inventory_report.${ext}`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch { showToast('Failed to generate report.', 'error'); }
+    finally { setInvRptLoading(false); }
+  }
+
+  function toggleSort(field) {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+  }
+
+  function sortIcon(field) {
+    if (sortField !== field) return '↕️';
+    return sortDir === 'asc' ? '↑' : '↓';
+  }
+
   const selectCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-slate-200">
-      <div className="max-w-[1500px] mx-auto px-8 py-10">
+      <div className="max-w-screen-xl mx-auto px-8 py-10">
 
         {/* ── Header ─────────────────────────────────────── */}
         <div className="flex justify-between items-start mb-8">
@@ -188,8 +289,19 @@ export default function AllItems() {
           <table style={{ minWidth: "1200px" }} className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-amber-300 to-sky-600 text-white">
-                {['#', 'Item Name', 'Category', 'Total Stock', 'All-Time Distributed', 'Usage Rate'].map(h => (
-                  <th key={h} className="py-4 px-6 text-center text-xs font-semibold uppercase tracking-wider">{h}</th>
+                {[
+                  { label: '#',                    field: null              },
+                  { label: 'Item Name',            field: 'item_name'       },
+                  { label: 'Category',             field: 'category_name'   },
+                  { label: 'Total Stock',          field: 'total_stock'     },
+                  { label: 'All-Time Distributed', field: 'total_distributed'},
+                  { label: 'Usage Rate',           field: null              },
+                ].map(({ label, field }) => (
+                  <th key={label}
+                    onClick={() => field && toggleSort(field)}
+                    className={`py-4 px-6 text-center text-xs font-semibold uppercase tracking-wider ${field ? 'cursor-pointer hover:bg-white/10 select-none' : ''}`}>
+                    {label} {field ? sortIcon(field) : ''}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -335,9 +447,143 @@ export default function AllItems() {
       />
 
       {/* ── Ledger Modal ───────────────────────────────────── */}
-      <Modal open={showLedger} onClose={() => setShowLedger(false)}
-        title="📂 Item Ledger" subtitle="View complete transaction history for any item" maxWidth="max-w-4xl">
-        <div className="bg-white rounded-xl p-6 mb-6 border border-sky-200">
+      <Modal open={showLedger} onClose={() => { setShowLedger(false); setLedgerData(null); setLedgerPreview(null); }}
+        title="📂 Item Ledger" subtitle="View transaction history and movement preview" maxWidth="max-w-5xl">
+
+        {/* ── Tabs ── */}
+        <div className="flex gap-2 mb-6">
+          {[
+            { id: 'ledger',  label: '📋 Item Ledger'   },
+            { id: 'preview', label: '👁️ Movement Preview' },
+          ].map(t => (
+            <button key={t.id}
+              onClick={() => { setLedgerData(null); setLedgerPreview(null); }}
+              className="px-5 py-2 rounded-xl font-medium text-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Inventory Preview & Report ── */}
+        <div className="bg-gradient-to-r from-emerald-50 to-sky-50 rounded-xl p-5 border border-emerald-200 mb-4">
+          <h3 className="font-semibold text-slate-700 mb-3">📋 Inventory Preview & Report</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Filter Type</label>
+              <select value={invFilterType} onChange={e => { setInvFilterType(e.target.value); setInvPreview(null); }}
+                className={selectCls}>
+                <option value="all">All Items</option>
+                <option value="category">By Category</option>
+                <option value="classification">By Classification</option>
+                <option value="period">Custom Period</option>
+                <option value="month">This Month</option>
+              </select>
+            </div>
+            {(invFilterType === 'category' || invFilterType === 'classification') && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
+                <select value={ledgerCat} onChange={e => handleLedgerCatChange(e.target.value)} className={selectCls}>
+                  <option value="">Select Category</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
+            {invFilterType === 'classification' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Classification</label>
+                <select value={ledgerCls} onChange={e => handleLedgerClsChange(e.target.value)}
+                  disabled={!clsOptions.length}
+                  className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
+                  <option value="">Select Classification</option>
+                  {clsOptions.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
+                </select>
+              </div>
+            )}
+            {(invFilterType === 'category' || invFilterType === 'classification') && (<>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">From Date</label>
+                <input type="date" value={invDateFrom} onChange={e => setInvDateFrom(e.target.value)} className={selectCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">To Date</label>
+                <input type="date" value={invDateTo} onChange={e => setInvDateTo(e.target.value)} className={selectCls} />
+              </div>
+            </>)}
+            {invFilterType === 'period' && (<>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">From Date</label>
+                <input type="date" value={invDateFrom} onChange={e => setInvDateFrom(e.target.value)} className={selectCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">To Date</label>
+                <input type="date" value={invDateTo} onChange={e => setInvDateTo(e.target.value)} className={selectCls} />
+              </div>
+            </>)}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2 mt-1">
+            <button onClick={loadInvPreview} disabled={invPreviewLoading}
+              className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 text-sm">
+              {invPreviewLoading ? '⏳ Loading...' : '👁️ Preview'}
+            </button>
+            <button onClick={() => handleInvExport('pdf')} disabled={invExporting}
+              className="px-5 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50">
+              📄 Export PDF
+            </button>
+            <button onClick={() => handleInvExport('excel')} disabled={invExporting}
+              className="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50">
+              📊 Export Excel
+            </button>
+          </div>
+
+          {invPreviewError && <p className="text-red-600 text-sm mt-2">{invPreviewError}</p>}
+
+          {invPreview && (
+            <div className="mt-4 overflow-x-auto rounded-xl border border-emerald-200">
+              <table style={{ minWidth: '750px' }} className="w-full">
+                <thead>
+                  <tr className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs uppercase">
+                    {['Item Code','Item Description','Unit','In Stock','Unit Price','Amount'].map(h => (
+                      <th key={h} className={`py-3 px-4 font-semibold ${h !== 'Item Code' && h !== 'Item Description' && h !== 'Unit' ? 'text-right' : 'text-left'}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-emerald-100">
+                  {invPreview.length === 0 ? (
+                    <tr><td colSpan="6" className="py-8 text-center text-slate-400">No items found</td></tr>
+                  ) : invPreview.map((item, i) => (
+                    <tr key={i} className={`hover:bg-emerald-50/50 ${i % 2 === 1 ? 'bg-slate-50' : ''}`}>
+                      <td className="py-2 px-4 text-xs text-slate-500">{item.sku || '—'}</td>
+                      <td className="py-2 px-4 text-sm font-medium text-slate-800">{item.name}</td>
+                      <td className="py-2 px-4 text-sm text-slate-600">{item.unit || 'Pcs'}</td>
+                      <td className="py-2 px-4 text-sm text-slate-800 text-right font-semibold">{item.quantity}</td>
+                      <td className="py-2 px-4 text-sm text-slate-800 text-right">₱{parseFloat(item.unit_price ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                      <td className="py-2 px-4 text-sm text-slate-800 text-right font-semibold">₱{parseFloat(item.amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {invPreview.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-emerald-700 text-white">
+                      <td colSpan="5" className="py-2 px-4 text-sm font-bold">GRAND TOTAL</td>
+                      <td className="py-2 px-4 text-sm font-bold text-right">
+                        ₱{invPreview.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+              <div className="px-4 py-2 bg-emerald-50 border-t border-emerald-200 text-xs text-slate-500">
+                {invPreview.length} item{invPreview.length !== 1 ? 's' : ''} found
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Item Ledger Section ── */}
+        <div className="bg-white rounded-xl p-5 border border-sky-200">
+          <h3 className="font-semibold text-slate-700 mb-3">📋 Item Ledger</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>

@@ -198,7 +198,7 @@ export async function getItemsByClassification(req, res) {
 export async function addItem(req, res) {
   const {
     name, category_id, classification_id, supplier_id,
-    quantity, unit_price, unit, date_ordered, date_procured
+    quantity, unit_price, unit, date_ordered, date_procured, sku
   } = req.body;
 
   if (!name || !category_id || !supplier_id || quantity === undefined || quantity === '' || !unit_price || !date_ordered || !date_procured) {
@@ -206,23 +206,25 @@ export async function addItem(req, res) {
   }
 
   try {
-    await pool.query(
+    // Insert item first to get the ID
+    const result = await pool.query(
       `INSERT INTO items
          (name, category_id, classification_id, supplier_id, quantity, unit_price, unit, date_ordered, date_procured)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [
-        name,
-        category_id,
-        classification_id || null,
-        supplier_id,
-        quantity,
-        unit_price,
-        unit || 'Pcs',
-        date_ordered,
-        date_procured,
-      ]
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id`,
+      [name, category_id, classification_id || null, supplier_id, quantity, unit_price, unit || 'Pcs', date_ordered, date_procured]
     );
-    res.json({ success: true, message: 'Item added successfully!' });
+
+    const newId = result.rows[0].id;
+
+    // Auto-generate SKU if not provided manually
+    const finalSku = sku?.trim()
+      ? sku.trim()
+      : `${category_id}-${classification_id || '00'}-${newId}`;
+
+    await pool.query('UPDATE items SET sku = $1 WHERE id = $2', [finalSku, newId]);
+
+    res.json({ success: true, message: 'Item added successfully!', id: newId, sku: finalSku });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message });
   }
@@ -369,5 +371,82 @@ export async function validateStock(req, res) {
     }
   } catch (err) {
     res.status(500).json({ valid: false, message: 'Error validating stock', available: 0 });
+  }
+}
+
+// ─────────────────────────────────────────────
+// GET /api/items/movement/all
+// Item movement preview — accessible to all authenticated users
+// ─────────────────────────────────────────────
+export async function getItemMovementAll(req, res) {
+  const { item_id, category_id, classification_id, date_from, date_to, type } = req.query;
+
+  try {
+    const movements = [];
+
+    // IN — Procurements
+    if (!type || type === 'IN') {
+      let q = `SELECT i.id AS item_id, i.name AS item_name, i.quantity,
+                i.date_procured AS txn_date, 'IN' AS type, 'Procurement' AS source,
+                COALESCE(
+                  (SELECT al.username FROM activity_logs al
+                   WHERE al.module = 'items' AND al.action = 'CREATE'
+                   AND al.record_id = i.id ORDER BY al.created_at ASC LIMIT 1),
+                  'system'
+                ) AS performed_by
+               FROM items i WHERE i.is_active = true`;
+      const params = [];
+      let idx = 1;
+      if (item_id)           { q += ` AND i.id = $${idx++}`;              params.push(item_id); }
+      if (category_id)       { q += ` AND i.category_id = $${idx++}`;     params.push(category_id); }
+      if (classification_id) { q += ` AND i.classification_id = $${idx++}`; params.push(classification_id); }
+      if (date_from)         { q += ` AND i.date_procured >= $${idx++}`;  params.push(date_from); }
+      if (date_to)           { q += ` AND i.date_procured <= $${idx++}`;  params.push(date_to + ' 23:59:59'); }
+      q += ' ORDER BY i.date_procured DESC';
+      const result = await pool.query(q, params);
+      movements.push(...result.rows);
+    }
+
+    // OUT — Distributions
+    if (!type || type === 'OUT') {
+      let q = `SELECT d.item_id, i.name AS item_name, d.quantity,
+                d.distributed_at AS txn_date, 'OUT' AS type,
+                'Distribution' AS source, d.approved_by AS performed_by
+               FROM distributions d JOIN items i ON d.item_id = i.id WHERE 1=1`;
+      const params = [];
+      let idx = 1;
+      if (item_id)           { q += ` AND d.item_id = $${idx++}`;                    params.push(item_id); }
+      if (category_id)       { q += ` AND i.category_id = $${idx++}`;               params.push(category_id); }
+      if (classification_id) { q += ` AND i.classification_id = $${idx++}`;         params.push(classification_id); }
+      if (date_from)         { q += ` AND d.distributed_at >= $${idx++}`;           params.push(date_from); }
+      if (date_to)           { q += ` AND d.distributed_at <= $${idx++}`;           params.push(date_to + ' 23:59:59'); }
+      q += ' ORDER BY d.distributed_at DESC';
+      const result = await pool.query(q, params);
+      movements.push(...result.rows);
+    }
+
+    // ALLOC — Allocations
+    if (!type || type === 'ALLOC') {
+      let q = `SELECT a.item_id, i.name AS item_name, a.quantity,
+                a.allocated_at AS txn_date, 'ALLOC' AS type,
+                'Allocation' AS source, a.allocated_by AS performed_by
+               FROM allocations a JOIN items i ON a.item_id = i.id
+               WHERE a.status != 'deleted'`;
+      const params = [];
+      let idx = 1;
+      if (item_id)           { q += ` AND a.item_id = $${idx++}`;                   params.push(item_id); }
+      if (category_id)       { q += ` AND i.category_id = $${idx++}`;               params.push(category_id); }
+      if (classification_id) { q += ` AND i.classification_id = $${idx++}`;         params.push(classification_id); }
+      if (date_from)         { q += ` AND a.allocated_at >= $${idx++}`;             params.push(date_from); }
+      if (date_to)           { q += ` AND a.allocated_at <= $${idx++}`;             params.push(date_to + ' 23:59:59'); }
+      q += ' ORDER BY a.allocated_at DESC';
+      const result = await pool.query(q, params);
+      movements.push(...result.rows);
+    }
+
+    movements.sort((a, b) => new Date(b.txn_date) - new Date(a.txn_date));
+    res.json({ data: movements, total: movements.length });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 }

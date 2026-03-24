@@ -762,3 +762,279 @@ export async function allocationsReport(req, res) {
     res.status(500).json({ message: 'Report error: ' + err.message });
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/reports/inventory?format=pdf|excel&category_id=&classification_id=
+// Inventory of Stocks Report — grouped by category
+// ─────────────────────────────────────────────────────────────
+export async function inventoryReport(req, res) {
+  const { format = 'pdf', category_id, classification_id } = req.query;
+
+  try {
+    let query = `
+      SELECT
+        i.sku,
+        i.name,
+        i.unit,
+        i.quantity,
+        i.unit_price,
+        (i.quantity * i.unit_price) AS amount,
+        c.name AS category_name,
+        cls.classification_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      LEFT JOIN classifications cls ON i.classification_id = cls.id
+      WHERE i.is_active = true
+    `;
+    const params = [];
+    let idx = 1;
+    if (category_id)       { query += ` AND i.category_id = $${idx++}`;       params.push(category_id); }
+    if (classification_id) { query += ` AND i.classification_id = $${idx++}`; params.push(classification_id); }
+    query += ' ORDER BY c.name ASC, cls.classification_name ASC, i.name ASC';
+
+    const result = await pool.query(query, params);
+    const items  = result.rows;
+
+    // Group by category
+    const grouped = items.reduce((acc, item) => {
+      const cat = item.category_name ?? 'Uncategorized';
+      (acc[cat] ??= []).push(item);
+      return acc;
+    }, {});
+
+    const fmtMoney = (n) => `₱${parseFloat(n ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+    const fmtNum   = (n) => parseFloat(n ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+    const today    = new Date().toLocaleDateString('en-PH', { dateStyle: 'long' });
+    const grandTotal = items.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0);
+
+    // ── PDF ────────────────────────────────────────────────────
+    if (format === 'pdf') {
+      const PDFDocument = (await import('pdfkit')).default;
+      const doc = new PDFDocument({ size: 'LETTER', margin: 40, bufferPages: true });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="inventory_report_${Date.now()}.pdf"`);
+      doc.pipe(res);
+
+      const W = doc.page.width - 80;
+
+      // Header
+      doc.fontSize(13).font('Helvetica-Bold').fillColor('#1E3A5F')
+         .text('CAUAYAN CITY WATER DISTRICT', 40, 40, { align: 'center', width: W });
+      doc.fontSize(8).font('Helvetica').fillColor('#64748B')
+         .text('$166 Africano cor., Burgos Streets, District 2, Cauayan City 3305, Isabela Philippines', 40, 58, { align: 'center', width: W });
+      doc.moveDown(0.5);
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#1E3A5F')
+         .text('INVENTORY OF STOCKS', 40, 78, { align: 'center', width: W });
+      doc.fontSize(9).font('Helvetica').fillColor('#334155')
+         .text(`Made as of ${today}`, 40, 93, { align: 'center', width: W });
+
+      doc.moveTo(40, 108).lineTo(W + 40, 108).lineWidth(1.5).strokeColor('#2563EB').stroke();
+
+      // Table header
+      const cols = [
+        { label: 'Item Code',        x: 40,  w: 70  },
+        { label: 'Item Description', x: 110, w: 200 },
+        { label: 'Unit',             x: 310, w: 40  },
+        { label: 'In Stock',         x: 350, w: 55  },
+        { label: 'Unit Price',       x: 405, w: 75  },
+        { label: 'Amount',           x: 480, w: 80  },
+      ];
+
+      let y = 115;
+      // Header row
+      doc.rect(40, y, W, 16).fill('#1E3A5F');
+      cols.forEach(col => {
+        doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#FFFFFF')
+           .text(col.label, col.x + 2, y + 4, { width: col.w - 4, align: col.label === 'Amount' || col.label === 'Unit Price' || col.label === 'In Stock' ? 'right' : 'left' });
+      });
+      y += 16;
+
+      let rowIdx = 0;
+      Object.entries(grouped).forEach(([catName, catItems]) => {
+        // Category header
+        if (y + 14 > doc.page.height - 40) { doc.addPage(); y = 40; }
+        doc.rect(40, y, W, 14).fill('#EFF6FF');
+        doc.fontSize(8).font('Helvetica-Bold').fillColor('#1E3A5F')
+           .text(catName, 44, y + 3, { width: W - 8 });
+        y += 14;
+
+        catItems.forEach(item => {
+          if (y + 13 > doc.page.height - 40) { doc.addPage(); y = 40; }
+          const bg = rowIdx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+          doc.rect(40, y, W, 13).fill(bg);
+          doc.moveTo(40, y + 13).lineTo(W + 40, y + 13).lineWidth(0.3).strokeColor('#CBD5E1').stroke();
+
+          doc.fontSize(7.5).font('Helvetica').fillColor('#1E293B');
+          doc.text(item.sku || '—',           cols[0].x + 2, y + 2.5, { width: cols[0].w - 4 });
+          doc.text(item.name,                  cols[1].x + 2, y + 2.5, { width: cols[1].w - 4 });
+          doc.text(item.unit || 'Pcs',         cols[2].x + 2, y + 2.5, { width: cols[2].w - 4 });
+          doc.text(String(item.quantity),      cols[3].x + 2, y + 2.5, { width: cols[3].w - 4, align: 'right' });
+          doc.text(fmtNum(item.unit_price),    cols[4].x + 2, y + 2.5, { width: cols[4].w - 4, align: 'right' });
+          doc.text(fmtNum(item.amount),        cols[5].x + 2, y + 2.5, { width: cols[5].w - 4, align: 'right' });
+
+          y += 13;
+          rowIdx++;
+        });
+
+        // Category subtotal
+        const catTotal = catItems.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0);
+        doc.rect(40, y, W, 12).fill('#DBEAFE');
+        doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#1E3A5F')
+           .text(`Subtotal — ${catName}`, cols[1].x + 2, y + 2.5, { width: 240 })
+           .text(fmtNum(catTotal), cols[5].x + 2, y + 2.5, { width: cols[5].w - 4, align: 'right' });
+        y += 12;
+      });
+
+      // Grand Total
+      y += 4;
+      doc.rect(40, y, W, 16).fill('#1E3A5F');
+      doc.fontSize(9).font('Helvetica-Bold').fillColor('#FFFFFF')
+         .text('GRAND TOTAL', cols[1].x + 2, y + 3.5, { width: 240 })
+         .text(fmtNum(grandTotal), cols[5].x + 2, y + 3.5, { width: cols[5].w - 4, align: 'right' });
+
+      // Page numbers
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(7).fillColor('#94A3B8')
+           .text(`Page ${i + 1} of ${range.count}`, 40, doc.page.height - 25, { align: 'right', width: W });
+      }
+
+      doc.end();
+      return;
+    }
+
+    // ── Excel ──────────────────────────────────────────────────
+    const ExcelJS = (await import('exceljs')).default;
+    const wb     = new ExcelJS.Workbook();
+    wb.creator    = 'CCWD Inventory System';
+    const ws     = wb.addWorksheet('Inventory of Stocks');
+
+    ws.columns = [
+      { key: 'code', width: 16  },
+      { key: 'name', width: 40  },
+      { key: 'unit', width: 10  },
+      { key: 'qty',  width: 12  },
+      { key: 'price',width: 16  },
+      { key: 'amt',  width: 18  },
+    ];
+
+    // Title rows
+    ['A1:F1','A2:F2','A3:F3','A4:F4'].forEach(r => ws.mergeCells(r));
+    ws.getCell('A1').value = 'CAUAYAN CITY WATER DISTRICT';
+    ws.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FF1E3A5F' } };
+    ws.getCell('A1').alignment = { horizontal: 'center' };
+    ws.getRow(1).height = 24;
+
+    ws.getCell('A2').value = '$166 Africano cor., Burgos Streets, District 2, Cauayan City 3305, Isabela Philippines';
+    ws.getCell('A2').font = { size: 8, color: { argb: 'FF64748B' } };
+    ws.getCell('A2').alignment = { horizontal: 'center' };
+
+    ws.getCell('A3').value = 'INVENTORY OF STOCKS';
+    ws.getCell('A3').font = { bold: true, size: 12, color: { argb: 'FF1E3A5F' } };
+    ws.getCell('A3').alignment = { horizontal: 'center' };
+
+    ws.getCell('A4').value = `Made as of ${today}`;
+    ws.getCell('A4').font = { size: 9, italic: true, color: { argb: 'FF334155' } };
+    ws.getCell('A4').alignment = { horizontal: 'center' };
+    ws.addRow([]);
+
+    // Table header
+    const hRow = ws.addRow(['Item Code', 'Item Description', 'Unit', 'In Stock', 'Unit Price', 'Amount']);
+    hRow.height = 20;
+    hRow.eachCell(cell => {
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+      cell.font   = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    Object.entries(grouped).forEach(([catName, catItems]) => {
+      // Category header
+      const catRow = ws.addRow([catName]);
+      ws.mergeCells(`A${catRow.number}:F${catRow.number}`);
+      catRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
+      catRow.getCell(1).font = { bold: true, size: 9, color: { argb: 'FF1E3A5F' } };
+      catRow.height = 16;
+
+      catItems.forEach((item, i) => {
+        const r = ws.addRow([
+          item.sku || '—',
+          item.name,
+          item.unit || 'Pcs',
+          item.quantity,
+          parseFloat(item.unit_price ?? 0),
+          parseFloat(item.amount ?? 0),
+        ]);
+        r.height = 15;
+        const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
+        r.eachCell((cell, col) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+          cell.font = { size: 9 };
+          cell.border = { bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } } };
+          if (col >= 4) { cell.alignment = { horizontal: 'right' }; cell.numFmt = '#,##0.00'; }
+        });
+      });
+
+      // Subtotal
+      const catTotal = catItems.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0);
+      const stRow = ws.addRow(['', `Subtotal — ${catName}`, '', '', '', catTotal]);
+      stRow.getCell(2).font = { bold: true, size: 9, color: { argb: 'FF1E3A5F' } };
+      stRow.getCell(6).font = { bold: true, size: 9, color: { argb: 'FF1E3A5F' } };
+      stRow.getCell(6).numFmt = '#,##0.00';
+      stRow.getCell(6).alignment = { horizontal: 'right' };
+      stRow.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; });
+    });
+
+    // Grand total
+    const gtRow = ws.addRow(['', 'GRAND TOTAL', '', '', '', grandTotal]);
+    gtRow.height = 20;
+    gtRow.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    });
+    gtRow.getCell(6).numFmt = '#,##0.00';
+    gtRow.getCell(6).alignment = { horizontal: 'right' };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="inventory_report_${Date.now()}.xlsx"`);
+    await wb.xlsx.write(res);
+
+  } catch (err) {
+    console.error('Inventory report error:', err);
+    res.status(500).json({ message: 'Report error: ' + err.message });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/reports/inventory-preview
+// Returns raw inventory data for preview (no file download)
+// ─────────────────────────────────────────────────────────────
+export async function inventoryPreview(req, res) {
+  const { category_id, classification_id, date_from, date_to } = req.query;
+
+  try {
+    let query = `
+      SELECT
+        i.sku, i.name, i.unit, i.quantity, i.unit_price,
+        (i.quantity * i.unit_price) AS amount,
+        c.name AS category_name,
+        cls.classification_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      LEFT JOIN classifications cls ON i.classification_id = cls.id
+      WHERE i.is_active = true
+    `;
+    const params = [];
+    let idx = 1;
+    if (category_id)       { query += ` AND i.category_id = $${idx++}`;        params.push(category_id); }
+    if (classification_id) { query += ` AND i.classification_id = $${idx++}`;  params.push(classification_id); }
+    if (date_from)         { query += ` AND i.date_procured >= $${idx++}`;     params.push(date_from); }
+    if (date_to)           { query += ` AND i.date_procured <= $${idx++}`;     params.push(date_to + ' 23:59:59'); }
+    query += ' ORDER BY c.name ASC, i.name ASC';
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+}

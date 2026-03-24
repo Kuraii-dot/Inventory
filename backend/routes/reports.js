@@ -6,6 +6,8 @@ import {
   overallReport,
   departmentReport,
   allocationsReport,
+  inventoryReport,
+  inventoryPreview,
 } from '../controllers/reportsController.js';
 
 const router = Router();
@@ -22,5 +24,11 @@ router.post('/department', departmentReport);
 
 // POST /api/reports/allocations     ← generate_allocation_report.php
 router.post('/allocations', allocationsReport);
+
+// GET /api/reports/inventory
+router.get('/inventory', inventoryReport);
+
+// GET /api/reports/inventory-preview
+router.get('/inventory-preview', inventoryPreview);
 
 export default router;
