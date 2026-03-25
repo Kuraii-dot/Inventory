@@ -478,7 +478,7 @@ export default function AllItems() {
       />
 
       {/* ── Ledger Modal ───────────────────────────────────── */}
-      <Modal open={showLedger} onClose={() => { setShowLedger(false); setLedgerData(null); setLedgerPreview(null); }}
+      <Modal open={showLedger} onClose={() => { setShowLedger(false); setLedgerData(null); setInvPreview(null); }}
         title="📂 Item Ledger" subtitle="View transaction history and movement preview" maxWidth="max-w-5xl">
 
         {/* ── Tabs ── */}
@@ -488,7 +488,7 @@ export default function AllItems() {
             { id: 'preview', label: '👁️ Movement Preview' },
           ].map(t => (
             <button key={t.id}
-              onClick={() => { setLedgerData(null); setLedgerPreview(null); }}
+              onClick={() => { setLedgerData(null); setInvPreview(null); }}
               className="px-5 py-2 rounded-xl font-medium text-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
               {t.label}
             </button>

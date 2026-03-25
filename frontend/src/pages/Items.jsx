@@ -41,6 +41,9 @@ export default function Items() {
   });
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
+  const [showFilters,  setShowFilters]  = useState(false);
+  const [sortField,    setSortField]    = useState('date_procured');
+  const [sortDir,      setSortDir]      = useState('desc');
   const [showAddItem,             setShowAddItem]             = useState(false);
   const [editItemId,              setEditItemId]              = useState(null);
   const [showCategoryModal,       setShowCategoryModal]       = useState(false);
@@ -134,13 +137,32 @@ export default function Items() {
     }
   }
 
+  const sortedItems = [...items].sort((a, b) => {
+    let av, bv;
+    switch (sortField) {
+      case 'name':
+        av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
+      case 'date_procured':
+        av = new Date(a.date_procured ?? 0); bv = new Date(b.date_procured ?? 0); break;
+      case 'quantity':
+        av = parseInt(a.quantity ?? 0); bv = parseInt(b.quantity ?? 0); break;
+      case 'unit_price':
+        av = parseFloat(a.unit_price ?? 0); bv = parseFloat(b.unit_price ?? 0); break;
+      default:
+        av = a.name.toLowerCase(); bv = b.name.toLowerCase();
+    }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   const lowStockCount = items.filter(i => i.quantity < 10).length;
   const hasFilters    = Object.values(appliedFilters).some(Boolean);
   const selectCls     = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <div className="max-w-[1900px] mx-auto px-8 py-8">
+      <div className="max-w-[1800px] mx-auto px-8 py-8">
 
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
@@ -185,74 +207,120 @@ export default function Items() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6 mb-6">
-          <form onSubmit={handleApplyFilters} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Search Items</label>
-                <div className="relative">
-                  <input type="text" name="search" placeholder="Search by name..."
-                    value={filters.search} onChange={handleFilterChange}
-                    className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+        {/* Filter Drawer Toggle + Sort */}
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm border-2 transition-all duration-300 ${
+              showFilters
+                ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                : 'bg-white text-blue-600 border-blue-200 hover:border-blue-400 hover:shadow-md'
+            }`}>
+            <span>{showFilters ? '✕' : '🔍'}</span>
+            <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
+            {hasFilters && !showFilters && (
+              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">Active</span>
+            )}
+          </button>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <span className="text-sm text-slate-500">Sort:</span>
+            {[
+              { field: 'name',          labelAsc: 'A→Z',        labelDesc: 'Z→A'        },
+              { field: 'date_procured', labelAsc: 'Oldest',     labelDesc: 'Newest'     },
+              { field: 'quantity',      labelAsc: 'Low Stock',  labelDesc: 'High Stock' },
+              { field: 'unit_price',    labelAsc: 'Low Price',  labelDesc: 'High Price' },
+            ].map(s => (
+              <button key={s.field}
+                onClick={() => {
+                  if (sortField === s.field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                  else { setSortField(s.field); setSortDir(s.field === 'date_procured' ? 'desc' : 'asc'); }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  sortField === s.field
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50'
+                }`}>
+                {sortField === s.field
+                  ? `${sortDir === 'asc' ? '↑' : '↓'} ${sortDir === 'asc' ? s.labelAsc : s.labelDesc}`
+                  : s.labelAsc}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Collapsible Filter Drawer */}
+        {showFilters && (
+          <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6 mb-6 animate-fade-in">
+            <form onSubmit={handleApplyFilters} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Search Items</label>
+                  <div className="relative">
+                    <input type="text" name="search" placeholder="Search by name..."
+                      value={filters.search} onChange={handleFilterChange}
+                      className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Category</label>
+                  <select name="category_id" value={filters.category_id} onChange={handleFilterChange} className={selectCls}>
+                    <option value="">All Categories</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Classification</label>
+                  <select name="classification_id" value={filters.classification_id} onChange={handleFilterChange}
+                    disabled={clsOptions.length === 0}
+                    className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
+                    <option value="">{clsOptions.length === 0 ? 'Select category first' : 'All Classifications'}</option>
+                    {clsOptions.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
+                  </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Category</label>
-                <select name="category_id" value={filters.category_id} onChange={handleFilterChange} className={selectCls}>
-                  <option value="">All Categories</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Month</label>
+                  <select name="filter_month" value={filters.filter_month} onChange={handleFilterChange} className={selectCls}>
+                    <option value="">All Months</option>
+                    {MONTHS.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Year</label>
+                  <select name="filter_year" value={filters.filter_year} onChange={handleFilterChange} className={selectCls}>
+                    <option value="">All Years</option>
+                    {buildYears().map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Date From</label>
+                  <input type="date" name="date_from" value={filters.date_from} onChange={handleFilterChange} className={selectCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-2">Date To</label>
+                  <input type="date" name="date_to" value={filters.date_to} onChange={handleFilterChange} className={selectCls} />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Classification</label>
-                <select name="classification_id" value={filters.classification_id} onChange={handleFilterChange}
-                  disabled={clsOptions.length === 0}
-                  className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-                  <option value="">{clsOptions.length === 0 ? 'Select category first' : 'All Classifications'}</option>
-                  {clsOptions.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Month</label>
-                <select name="filter_month" value={filters.filter_month} onChange={handleFilterChange} className={selectCls}>
-                  <option value="">All Months</option>
-                  {MONTHS.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Year</label>
-                <select name="filter_year" value={filters.filter_year} onChange={handleFilterChange} className={selectCls}>
-                  <option value="">All Years</option>
-                  {buildYears().map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Date From</label>
-                <input type="date" name="date_from" value={filters.date_from} onChange={handleFilterChange} className={selectCls} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-2">Date To</label>
-                <input type="date" name="date_to" value={filters.date_to} onChange={handleFilterChange} className={selectCls} />
-              </div>
-            </div>
-            <div className="flex items-center gap-3 pt-2">
-              <button type="submit"
-                className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg hover:shadow-lg transition-all duration-300">
-                Apply Filters
-              </button>
-              {hasFilters && (
-                <button type="button" onClick={handleReset}
-                  className="px-6 py-2.5 bg-slate-100 text-slate-600 font-medium rounded-lg hover:bg-slate-200 transition-colors">
-                  Reset
+              <div className="flex items-center gap-3 pt-2">
+                <button type="submit"
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg hover:shadow-lg transition-all duration-300">
+                  Apply Filters
                 </button>
-              )}
-            </div>
-          </form>
-        </div>
+                {hasFilters && (
+                  <button type="button" onClick={handleReset}
+                    className="px-6 py-2.5 bg-slate-100 text-slate-600 font-medium rounded-lg hover:bg-slate-200 transition-colors">
+                    Reset
+                  </button>
+                )}
+                <button type="button" onClick={() => setShowFilters(false)}
+                  className="ml-auto px-4 py-2.5 text-slate-400 hover:text-slate-600 text-sm transition-colors">
+                  ✕ Hide
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Record count */}
         <div className="flex items-center justify-between mb-3">
@@ -285,7 +353,7 @@ export default function Items() {
                       </div>
                     </td>
                   </tr>
-                ) : items.map(item => (
+                ) : sortedItems.map(item => (
                   <tr key={item.id}
                     className={`hover:bg-blue-50/30 transition-colors duration-150 ${item.quantity < 10 ? 'bg-red-50/50' : ''}`}>
                     <td className="py-4 px-4">
@@ -382,8 +450,8 @@ export default function Items() {
           <div className="mt-6">
             <button onClick={() => setShowDeactivated(v => !v)}
               className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium mb-3">
-              <span>{showDeactivated ? '⮟' : '⮞'}</span>
-              <span>Deactivated Items ({deactivated.length})</span>
+              <span>{showDeactivated ? '▼' : '▶'}</span>
+              <span>🗃️ Deactivated Items ({deactivated.length})</span>
             </button>
             {showDeactivated && (
               deactivated.length === 0 ? (

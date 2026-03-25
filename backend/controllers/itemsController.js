@@ -261,18 +261,24 @@ export async function updateItem(req, res) {
   }
 
   try {
-    await pool.query(
-      `UPDATE items SET
+    const params = [name, category_id, classification_id || null, supplier_id, quantity, unit_price, unit || 'Pcs', id];
+    let query = `UPDATE items SET
          name              = $1,
          category_id       = $2,
          classification_id = $3,
          supplier_id       = $4,
          quantity          = $5,
          unit_price        = $6,
-         unit              = $7
-       WHERE id = $8`,
-      [name, category_id, classification_id || null, supplier_id, quantity, unit_price, unit || 'Pcs', id]
-    );
+         unit              = $7`;
+
+    if (sku?.trim()) {
+      query += `, sku = $9`;
+      params.push(sku.trim());
+    }
+
+    query += ` WHERE id = $8`;
+
+    await pool.query(query, params);
     res.json({ success: true, message: 'Item updated successfully!' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message });
