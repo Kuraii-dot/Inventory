@@ -82,7 +82,7 @@ export default function Items() {
     setSuppliers(sups);
   }, []);
 
-  useEffect(() => { loadItems(appliedFilters, 1); loadDropdowns(); loadDeactivated(); }, []);
+  useEffect(() => { loadItems(appliedFilters, 1, sortField, sortDir); loadDropdowns(); loadDeactivated(); }, []);
 
   // ── Filters ───────────────────────────────────────────────
   async function handleFilterChange(e) {
@@ -98,14 +98,16 @@ export default function Items() {
   function handleApplyFilters(e) {
     e.preventDefault();
     setAppliedFilters(filters);
-    loadItems(filters, 1);
+    loadItems(filters, 1, sortField, sortDir);
   }
 
   function handleReset() {
     const empty = { search: '', category_id: '', classification_id: '', filter_month: '', filter_year: '', date_from: '', date_to: '' };
     setFilters(empty);
     setAppliedFilters(empty);
-    loadItems(empty, 1);
+    setSortField('date_procured');
+    setSortDir('desc');
+    loadItems(empty, 1, 'date_procured', 'desc');
   }
 
   // ── Delete / Restore ──────────────────────────────────────
@@ -118,7 +120,7 @@ export default function Items() {
     try {
       const result = await deleteItem(id);
       showToast(`✅ ${result.message}`, 'success');
-      loadItems(appliedFilters, page);
+      loadItems(appliedFilters, page, sortField, sortDir);
       loadDeactivated();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error deactivating item.', 'error');
@@ -130,7 +132,7 @@ export default function Items() {
     try {
       const result = await restoreItem(id);
       showToast(`✅ ${result.message}`, 'success');
-      loadItems(appliedFilters, page);
+      loadItems(appliedFilters, page, sortField, sortDir);
       loadDeactivated();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error restoring item.', 'error');
@@ -414,20 +416,20 @@ export default function Items() {
             <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
               <span className="text-sm text-slate-600">Page {page} of {totalPages} — {totalRecords} total items</span>
               <div className="flex gap-2">
-                <button disabled={page <= 1} onClick={() => loadItems(appliedFilters, page - 1)}
+                <button disabled={page <= 1} onClick={() => loadItems(appliedFilters, page - 1, sortField, sortDir)}
                   className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm">
                   ← Previous
                 </button>
                 {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
                   const pg = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
                   return (
-                    <button key={pg} onClick={() => loadItems(appliedFilters, pg)}
+                    <button key={pg} onClick={() => loadItems(appliedFilters, pg, sortField, sortDir)}
                       className={`px-4 py-2 rounded-lg text-sm border ${pg === page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
                       {pg}
                     </button>
                   );
                 })}
-                <button disabled={page >= totalPages} onClick={() => loadItems(appliedFilters, page + 1)}
+                <button disabled={page >= totalPages} onClick={() => loadItems(appliedFilters, page + 1, sortField, sortDir)}
                   className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm">
                   Next →
                 </button>
@@ -485,11 +487,11 @@ export default function Items() {
       {/* Modals */}
       <AddItemModal open={showAddItem} onClose={() => setShowAddItem(false)}
         categories={categories} suppliers={suppliers}
-        onSuccess={(msg, type = 'success') => { showToast(msg, type); loadItems(appliedFilters, page); }} />
+        onSuccess={(msg, type = 'success') => { showToast(msg, type); loadItems(appliedFilters, page, sortField, sortDir); }} />
 
       <EditItemModal open={!!editItemId} itemId={editItemId} onClose={() => setEditItemId(null)}
         categories={categories} suppliers={suppliers}
-        onSuccess={(msg, type = 'success') => { showToast(msg, type); loadItems(appliedFilters, page); setEditItemId(null); }} />
+        onSuccess={(msg, type = 'success') => { showToast(msg, type); loadItems(appliedFilters, page, sortField, sortDir); setEditItemId(null); }} />
 
       <CategoryModal open={showCategoryModal} onClose={() => setShowCategoryModal(false)}
         categories={categories} onRefresh={loadDropdowns} showToast={showToast} />
