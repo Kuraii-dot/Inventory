@@ -14,7 +14,7 @@ import pool from '../db/pool.js';
 // PHP: $_GET['search'], ['category_id'], ['classification_id'], ['filter_month'], ['filter_year']
 // ─────────────────────────────────────────────
 export async function getItems(req, res) {
-  const { search, category_id, classification_id, filter_month, filter_year, date_from, date_to, is_active } = req.query;
+  const { search, category_id, classification_id, filter_month, filter_year, date_from, date_to, is_active, sort_field, sort_dir } = req.query;
 
   let query = `
     SELECT
@@ -92,8 +92,12 @@ export async function getItems(req, res) {
   // Count query before adding ORDER BY and LIMIT
   const countQuery = `SELECT COUNT(*) FROM (${query}) AS c`;
 
-  // Now add ORDER BY + pagination params
-  query += ` ORDER BY i.id DESC LIMIT $${idx} OFFSET $${idx + 1}`;
+  // Sort
+  const allowedFields = { name: 'i.name', date_procured: 'i.date_procured', quantity: 'i.quantity', unit_price: 'i.unit_price' };
+  const orderField = allowedFields[sort_field] ?? 'i.id';
+  const orderDir   = sort_dir === 'asc' ? 'ASC' : 'DESC';
+
+  query += ` ORDER BY ${orderField} ${orderDir} LIMIT $${idx} OFFSET $${idx + 1}`;
   params.push(limit, offset);
 
   try {

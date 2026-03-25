@@ -51,10 +51,10 @@ export default function Items() {
   const [showClassificationModal, setShowClassificationModal] = useState(false);
 
   // ── Load items ────────────────────────────────────────────
-  const loadItems = useCallback(async (params = appliedFilters, pg = 1) => {
+  const loadItems = useCallback(async (params = appliedFilters, pg = 1, sf = sortField, sd = sortDir) => {
     setLoading(true);
     try {
-      const data = await fetchItems({ ...params, page: pg, limit: 15 });
+      const data = await fetchItems({ ...params, page: pg, limit: 15, sort_field: sf, sort_dir: sd });
       if (data.data) {
         setItems(data.data);
         setTotalPages(data.total_pages ?? 1);
@@ -137,24 +137,7 @@ export default function Items() {
     }
   }
 
-  const sortedItems = [...items].sort((a, b) => {
-    let av, bv;
-    switch (sortField) {
-      case 'name':
-        av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
-      case 'date_procured':
-        av = new Date(a.date_procured ?? 0); bv = new Date(b.date_procured ?? 0); break;
-      case 'quantity':
-        av = parseInt(a.quantity ?? 0); bv = parseInt(b.quantity ?? 0); break;
-      case 'unit_price':
-        av = parseFloat(a.unit_price ?? 0); bv = parseFloat(b.unit_price ?? 0); break;
-      default:
-        av = a.name.toLowerCase(); bv = b.name.toLowerCase();
-    }
-    if (av < bv) return sortDir === 'asc' ? -1 : 1;
-    if (av > bv) return sortDir === 'asc' ? 1 : -1;
-    return 0;
-  });
+
 
   const lowStockCount = items.filter(i => i.quantity < 10).length;
   const hasFilters    = Object.values(appliedFilters).some(Boolean);
@@ -231,8 +214,16 @@ export default function Items() {
             ].map(s => (
               <button key={s.field}
                 onClick={() => {
-                  if (sortField === s.field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-                  else { setSortField(s.field); setSortDir(s.field === 'date_procured' ? 'desc' : 'asc'); }
+                  if (sortField === s.field) {
+                    const newDir = sortDir === 'asc' ? 'desc' : 'asc';
+                    setSortDir(newDir);
+                    loadItems(appliedFilters, 1, s.field, newDir);
+                  } else {
+                    const newDir = s.field === 'date_procured' ? 'desc' : 'asc';
+                    setSortField(s.field);
+                    setSortDir(newDir);
+                    loadItems(appliedFilters, 1, s.field, newDir);
+                  }
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                   sortField === s.field
@@ -353,7 +344,7 @@ export default function Items() {
                       </div>
                     </td>
                   </tr>
-                ) : sortedItems.map(item => (
+                ) : items.map(item => (
                   <tr key={item.id}
                     className={`hover:bg-blue-50/30 transition-colors duration-150 ${item.quantity < 10 ? 'bg-red-50/50' : ''}`}>
                     <td className="py-4 px-4">
@@ -427,7 +418,7 @@ export default function Items() {
                   className="px-4 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-sm">
                   ← Previous
                 </button>
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
                   const pg = Math.max(1, Math.min(page - 2, totalPages - 4)) + i;
                   return (
                     <button key={pg} onClick={() => loadItems(appliedFilters, pg)}
