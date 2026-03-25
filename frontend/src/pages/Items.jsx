@@ -450,7 +450,7 @@ export default function Items() {
           <div className="mt-6">
             <button onClick={() => setShowDeactivated(v => !v)}
               className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium mb-3">
-              <span>{showDeactivated ? '▼' : '▶'}</span>
+              <span>{showDeactivated ? '⮟' : '⮞'}</span>
               <span>🗃️ Deactivated Items ({deactivated.length})</span>
             </button>
             {showDeactivated && (
