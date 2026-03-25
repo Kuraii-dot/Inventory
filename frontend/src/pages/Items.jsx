@@ -162,7 +162,7 @@ export default function Items() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <div className="max-w-[1800px] mx-auto px-8 py-8">
+      <div className="max-w-[1900px] mx-auto px-8 py-8">
 
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
