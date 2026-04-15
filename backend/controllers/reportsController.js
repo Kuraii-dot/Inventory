@@ -658,10 +658,17 @@ export async function departmentReport(req, res) {
 //    POST /api/reports/allocations
 // ══════════════════════════════════════════════════════════════
 export async function allocationsReport(req, res) {
-  const { format = 'pdf', timeframe = 'today', from, to } = req.body;
+  const { format = 'pdf', timeframe = 'today', from, to, department, category_id } = req.body;
 
   try {
     const { start, end } = getDateRange(timeframe, from, to);
+
+    const params = [start + ' 00:00:00', end + ' 23:59:59'];
+    let idx = 3;
+    let extraWhere = '';
+
+    if (department)                        { extraWhere += ` AND a.department = $${idx++}`;    params.push(department); }
+    if (category_id && category_id !== 'all') { extraWhere += ` AND a.category_id = $${idx++}`; params.push(category_id); }
 
     const result = await pool.query(`
       SELECT
@@ -673,12 +680,17 @@ export async function allocationsReport(req, res) {
       JOIN categories c ON a.category_id = c.id
       WHERE a.allocated_at BETWEEN $1 AND $2
         AND a.status != 'deleted'
+        ${extraWhere}
       ORDER BY a.allocated_at ASC`,
-      [start + ' 00:00:00', end + ' 23:59:59']
+      params
     );
     const rows     = result.rows;
     const totalQty = rows.reduce((s, r) => s + parseInt(r.quantity || 0), 0);
-    const subtitle = `Period: ${fmtDate(start)}  –  ${fmtDate(end)}  •  ${rows.length} allocation${rows.length !== 1 ? 's' : ''}`;
+    const filterDesc = [
+      department ? `Dept: ${department}` : '',
+      category_id && category_id !== 'all' ? `Category: ${category_id}` : '',
+    ].filter(Boolean).join(' • ');
+    const subtitle = `Period: ${fmtDate(start)}  –  ${fmtDate(end)}  •  ${rows.length} allocation${rows.length !== 1 ? 's' : ''}${filterDesc ? `  •  ${filterDesc}` : ''}`;
 
     // ── PDF ──────────────────────────────────────────────────
     if (format === 'pdf') {

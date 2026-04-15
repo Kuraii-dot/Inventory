@@ -129,6 +129,26 @@ export default function ReportModal({
           </div>
         )}
 
+        {/* Department + Item filters for allocations report */}
+        {type === 'allocations' && (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Department</label>
+              <select name="department" value={form.department} onChange={handleChange} className={selectCls}>
+                <option value="">All Departments</option>
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
+              <select name="category_id" value={form.category_id} onChange={handleChange} className={selectCls}>
+                <option value="all">All Categories</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
         {/* Category + signatories for overall report */}
         {type === 'overall' && (
           <>

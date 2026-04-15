@@ -7,6 +7,7 @@ import {
   deleteAllocation, returnAllocation,
 } from '../api/allocations.js';
 import { useToast, ToastContainer } from '../hooks/useToast.jsx';
+import { fetchCategories } from '../api/items.js';
 import Modal        from '../components/Modal.jsx';
 import GroupedTable from '../components/GroupedTable.jsx';
 import ItemRows     from '../components/ItemRows.jsx';
@@ -27,6 +28,7 @@ export default function Allocation() {
   const { toasts, showToast } = useToast();
 
   const [records,    setRecords]    = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [filters,    setFilters]    = useState({ search: '', timeframe: 'all', startDate: '', endDate: '' });
   const [page,       setPage]       = useState(1);
@@ -72,6 +74,10 @@ export default function Allocation() {
       setLoading(false);
     }
   }, [filters]);
+
+  useEffect(() => {
+    fetchCategories().then(setCategories).catch(console.error);
+  }, []);
 
   useEffect(() => { loadAllocations(1); }, []);
 
@@ -223,12 +229,12 @@ export default function Allocation() {
             </button>
             <button onClick={() => handleDelete(row.id)}
               className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium">
-              🗑️ Delete
+              🗑️
             </button>
             {row.status === 'active' && (
               <button onClick={() => openReturn(row.id)}
                 className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-medium">
-                ↩️ Return
+                ↩️
               </button>
             )}
           </div>
@@ -241,7 +247,7 @@ export default function Allocation() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-violet-50">
-      <div className="max-w-[1600px] mx-auto px-8 py-10">
+      <div className="max-w-screen-xl mx-auto px-8 py-10">
 
         {/* ── Header ─────────────────────────────────────── */}
         <div className="flex justify-between items-start mb-8">
@@ -531,6 +537,7 @@ export default function Allocation() {
         open={showReport}
         onClose={() => setShowReport(false)}
         type="allocations"
+        categories={categories}
       />
 
       <ToastContainer toasts={toasts} />
