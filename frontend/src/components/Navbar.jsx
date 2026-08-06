@@ -18,6 +18,7 @@ const BASE_LINKS = [
   { to: '/allocation',    label: 'Allocation'     },
   { to: '/distributions', label: 'Distributions'  },
   { to: '/items',         label: 'Manage Items'   },
+  { to: '/feature',       label: 'Personnel Assets' },
 ];
 
 export default function Navbar() {

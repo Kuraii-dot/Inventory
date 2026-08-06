@@ -1,0 +1,22 @@
+import { Router } from 'express';
+import { authenticate } from '../middleware/auth.js';
+import * as controller from '../controllers/personnelAssetsController.js';
+
+const router = Router();
+router.get('/qr/:token', controller.publicQrLookup);
+router.use(authenticate);
+router.get('/personnel', controller.listPersonnel);
+router.post('/personnel', controller.createPersonnel);
+router.put('/personnel/:id', controller.updatePersonnel);
+router.delete('/personnel/:id', controller.archivePersonnel);
+router.get('/personnel/:id/assets', controller.getPersonnelAssets);
+router.get('/inventory/assignable', controller.listAssignableInventory);
+router.post('/assignments', controller.assignAsset);
+router.get('/assets/:id', controller.getAssetDetails);
+router.post('/assets/:id/maintenance', controller.addMaintenance);
+router.put('/assets/:id/maintenance/:maintenanceId', controller.updateMaintenance);
+router.delete('/assets/:id/maintenance/:maintenanceId', controller.removeMaintenance);
+router.post('/assets/:id/return', controller.returnAsset);
+router.post('/assets/:id/transfer', controller.transferAsset);
+router.post('/assets/:id/phase-out', controller.phaseOutAsset);
+export default router;
