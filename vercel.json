@@ -13,6 +13,13 @@
   },
   "rewrites": [
     {
+      "source": "/asset/(.*)",
+      "destination": {
+        "service": "api",
+        "path": "/asset/$1"
+      }
+    },
+    {
       "source": "/api/(.*)",
       "destination": {
         "service": "api"

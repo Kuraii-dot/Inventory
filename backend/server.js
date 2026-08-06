@@ -16,6 +16,7 @@ import ledgerRoutes         from './routes/ledger.js';
 import userRoutes           from './routes/users.js';
 import adminRoutes          from './routes/admin.js';
 import personnelAssetsRoutes from './routes/personnelAssets.js';
+import { publicQrPage } from './controllers/personnelAssetsController.js';
 import { ensureAssetSchema } from './db/ensureAssetSchema.js';
 
 dotenv.config();
@@ -72,6 +73,7 @@ app.use('/api/ledger',          ledgerRoutes);
 app.use('/api/users',           userRoutes);
 app.use('/api/admin',           adminRoutes);
 app.use('/api/personnel-assets', personnelAssetsRoutes);
+app.get('/asset/:token', publicQrPage);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 

@@ -266,9 +266,38 @@ export async function phaseOutAsset(req,res){
   try{await client.query('BEGIN');const asset=await client.query('SELECT status FROM serialized_assets WHERE id=$1 FOR UPDATE',[req.params.id]);if(!asset.rows[0])throw Object.assign(new Error('Asset not found.'),{status:404});if(asset.rows[0].status==='phased_out')throw Object.assign(new Error('This asset is already phased out.'),{status:409});await client.query("UPDATE asset_assignments SET status='phased_out',returned_at=$1,condition_on_return=$2,ended_by=$3 WHERE asset_id=$4 AND status='active'",[b.phase_out_date||today(),nullable(b.final_condition),req.user.id,req.params.id]);await client.query('INSERT INTO asset_phase_outs (asset_id,phase_out_date,reason,final_condition,disposal_method,approved_by,notes,recorded_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',[req.params.id,b.phase_out_date||today(),clean(b.reason),nullable(b.final_condition),nullable(b.disposal_method),nullable(b.approved_by),nullable(b.notes),req.user.id]);await client.query("UPDATE serialized_assets SET status='phased_out',current_condition=COALESCE($1,current_condition),updated_at=NOW() WHERE id=$2",[nullable(b.final_condition),req.params.id]);await client.query('COMMIT');res.json({message:'Item phased out. Its complete history was preserved.'});}catch(err){await client.query('ROLLBACK');if(err.status)return res.status(err.status).json({message:err.message});serverError(res,err);}finally{client.release();}
 }
 
+async function getPublicQrAsset(token) {
+  const result = await pool.query(`SELECT sa.id,sa.asset_code,sa.item_type,sa.unit_price,sa.procured_at,sa.date_ordered,
+    sa.date_procured,sa.status,sa.current_condition,sa.notes,i.name AS inventory_name,
+    p.full_name AS assigned_to,p.department,p.position,aa.assigned_at,
+    COALESCE((SELECT SUM(am.parts_cost + am.service_cost) FROM asset_maintenance am
+      WHERE am.asset_id=sa.id AND am.is_voided=FALSE),0) AS maintenance_cost,
+    COALESCE((SELECT json_agg(json_build_object('date_reported',am.date_reported,'reason',am.reason,
+      'work_performed',am.work_performed,'parts_added',am.parts_added,'service_provider',am.service_provider,
+      'parts_cost',am.parts_cost,'service_cost',am.service_cost,'condition_after',am.condition_after,
+      'completion_date',am.completion_date,'notes',am.notes) ORDER BY am.date_reported DESC,am.id DESC)
+      FROM asset_maintenance am WHERE am.asset_id=sa.id AND am.is_voided=FALSE),'[]'::json) AS maintenance
+    FROM serialized_assets sa JOIN items i ON i.id=sa.inventory_item_id
+    LEFT JOIN asset_assignments aa ON aa.asset_id=sa.id AND aa.status='active'
+    LEFT JOIN personnel p ON p.id=aa.personnel_id WHERE sa.qr_token=$1`,[token]);
+  return result.rows[0];
+}
+
 export async function publicQrLookup(req,res){
-  try{const result=await pool.query(`SELECT sa.asset_code,sa.item_type,sa.status,sa.current_condition,i.name AS inventory_name,
-    p.full_name AS assigned_to,p.department FROM serialized_assets sa JOIN items i ON i.id=sa.inventory_item_id
-    LEFT JOIN asset_assignments aa ON aa.asset_id=sa.id AND aa.status='active' LEFT JOIN personnel p ON p.id=aa.personnel_id
-    WHERE sa.qr_token=$1`,[req.params.token]);if(!result.rows[0])return res.status(404).json({message:'Asset not found.'});res.json(result.rows[0]);}catch(err){serverError(res,err);}
+  try{const asset=await getPublicQrAsset(req.params.token);if(!asset)return res.status(404).json({message:'Asset not found.'});res.json(asset);}catch(err){serverError(res,err);}
+}
+
+const html = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const publicDate = value => value ? new Date(value).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'}) : '—';
+const publicMoney = value => `₱${Number(value || 0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+
+export async function publicQrPage(req,res){
+  try {
+    const asset=await getPublicQrAsset(req.params.token);
+    if(!asset)return res.status(404).type('html').send('<!doctype html><title>Asset not found</title><h1>Asset not found</h1>');
+    const maintenance=Array.isArray(asset.maintenance)?asset.maintenance:[];
+    const currentValue=Number(asset.unit_price||0)+Number(asset.maintenance_cost||0);
+    const history=maintenance.length?maintenance.map(record=>`<article><div class="row"><strong>${html(publicDate(record.date_reported))}</strong><span>${html(publicMoney(Number(record.parts_cost||0)+Number(record.service_cost||0)))}</span></div><p><b>Reason:</b> ${html(record.reason||'—')}</p><p><b>Work performed:</b> ${html(record.work_performed||'—')}</p>${record.parts_added?`<p><b>Parts added:</b> ${html(record.parts_added)}</p>`:''}${record.service_provider?`<p><b>Provider:</b> ${html(record.service_provider)}</p>`:''}${record.condition_after?`<p><b>Condition after:</b> ${html(record.condition_after)}</p>`:''}</article>`).join(''):'<p class="muted">No maintenance has been recorded.</p>';
+    res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${html(asset.asset_code)} · Smart Inventory</title><style>*{box-sizing:border-box}body{margin:0;background:#f1f5f9;color:#1e293b;font:15px system-ui,-apple-system,"Segoe UI",sans-serif}.page{max-width:720px;margin:auto;padding:24px 14px 48px}.card{background:white;border:1px solid #e2e8f0;border-radius:22px;padding:24px;box-shadow:0 12px 35px #0f172a12}header{border-bottom:1px solid #e2e8f0;padding-bottom:18px;margin-bottom:20px}h1{margin:0;font-size:23px}.sub,.muted{color:#64748b}.code{color:#2563eb;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.asset{font-size:28px;font-weight:800;margin:5px 0 20px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{background:#f8fafc;border-radius:12px;padding:12px}.field small{display:block;color:#64748b;margin-bottom:5px}.field b{text-transform:capitalize}.cost{margin:18px 0;padding:16px;border-radius:14px;background:#eff6ff;color:#1d4ed8}.row{display:flex;justify-content:space-between;gap:14px}h2{font-size:18px;margin:28px 0 12px}article{border:1px solid #e2e8f0;border-radius:14px;padding:15px;margin-top:10px}article p{margin:9px 0;line-height:1.45}@media(max-width:520px){.grid{grid-template-columns:1fr}.card{padding:19px}}</style></head><body><main class="page"><section class="card"><header><h1>Smart Inventory</h1><div class="sub">Official public property record</div></header><div class="code">Asset code</div><div class="asset">${html(asset.asset_code)}</div><div class="grid"><div class="field"><small>Item</small><b>${html(asset.inventory_name)}</b></div><div class="field"><small>Type</small><b>${html(asset.item_type)}</b></div><div class="field"><small>Status</small><b>${html(String(asset.status||'').replaceAll('_',' '))}</b></div><div class="field"><small>Condition</small><b>${html(asset.current_condition)}</b></div><div class="field"><small>Assigned to</small><b>${html(asset.assigned_to||'Not currently assigned')}</b></div><div class="field"><small>Department / Position</small><b>${html([asset.department,asset.position].filter(Boolean).join(' · ')||'—')}</b></div><div class="field"><small>Procured at</small><b>${html(asset.procured_at||'—')}</b></div><div class="field"><small>Date procured</small><b>${html(publicDate(asset.date_procured))}</b></div></div><div class="cost"><div class="row"><span>Original price</span><b>${html(publicMoney(asset.unit_price))}</b></div><div class="row"><span>Total maintenance</span><b>${html(publicMoney(asset.maintenance_cost))}</b></div><hr style="border:0;border-top:1px solid #bfdbfe"><div class="row"><strong>Current total cost</strong><strong>${html(publicMoney(currentValue))}</strong></div></div><h2>Maintenance history</h2>${history}</section></main></body></html>`);
+  } catch(err){serverError(res,err);}
 }
