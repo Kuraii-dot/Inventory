@@ -1,0 +1,18 @@
+[package]
+name = "smart-inventory"
+version = "1.0.0"
+description = "Smart Inventory desktop application"
+authors = ["EFOI CCWD"]
+edition = "2021"
+
+[lib]
+name = "smart_inventory_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
