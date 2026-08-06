@@ -28,10 +28,22 @@ if (-not $pgRestore) {
   }
 }
 
-$allowedTables = @(
-  'users', 'activity_logs', 'categories', 'classifications', 'suppliers', 'items',
-  'allocations', 'distributions', 'combinations', 'combination_items', 'personnel',
-  'serialized_assets', 'asset_assignments', 'asset_maintenance', 'asset_phase_outs'
+$restoreOrder = @(
+  'users',
+  'categories',
+  'suppliers',
+  'classifications',
+  'items',
+  'allocations',
+  'distributions',
+  'combinations',
+  'combination_items',
+  'personnel',
+  'serialized_assets',
+  'asset_assignments',
+  'asset_maintenance',
+  'asset_phase_outs',
+  'activity_logs'
 )
 
 $temporaryList = Join-Path $env:TEMP ("smart-inventory-restore-{0}.list" -f ([guid]::NewGuid()))
@@ -45,11 +57,17 @@ try {
   $archiveList = & $pgRestore.FullName --list $BackupPath
   if ($LASTEXITCODE -ne 0) { throw 'Unable to read the PostgreSQL backup.' }
 
-  $selected = $archiveList | Where-Object {
-    $line = $_
-    $allowedTables | Where-Object {
-      $table = $_
-      $line -match " (TABLE DATA|SEQUENCE SET) public (${table}|${table}_id_seq) "
+  # Custom archives can list table data in an order that does not respect
+  # foreign keys. Build an explicit dependency-safe restore list.
+  $selected = @()
+  foreach ($table in $restoreOrder) {
+    $selected += $archiveList | Where-Object {
+      $_ -match " TABLE DATA public $table "
+    }
+  }
+  foreach ($table in $restoreOrder) {
+    $selected += $archiveList | Where-Object {
+      $_ -match " SEQUENCE SET public ${table}_id_seq "
     }
   }
 
@@ -58,6 +76,7 @@ try {
 
   & $pgRestore.FullName `
     --exit-on-error `
+    --single-transaction `
     --data-only `
     --no-owner `
     --no-privileges `
