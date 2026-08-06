@@ -5,4 +5,5 @@ frontend/dist/
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
 backend/.env
+backend/logs/
 .env
