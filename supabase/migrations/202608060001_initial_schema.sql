@@ -28,12 +28,17 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 CREATE TABLE IF NOT EXISTS categories (
   id BIGSERIAL PRIMARY KEY,
   name VARCHAR(255) UNIQUE NOT NULL,
+  description TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS suppliers (
   id BIGSERIAL PRIMARY KEY,
   name VARCHAR(255) UNIQUE NOT NULL,
+  contact_person VARCHAR(255),
+  phone VARCHAR(100),
+  email VARCHAR(255),
+  address TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -52,10 +57,12 @@ CREATE TABLE IF NOT EXISTS items (
   classification_id BIGINT REFERENCES classifications(id) ON DELETE SET NULL,
   supplier_id BIGINT NOT NULL REFERENCES suppliers(id),
   quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  price NUMERIC(14,2),
   unit_price NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (unit_price >= 0),
   unit VARCHAR(50) NOT NULL DEFAULT 'Pcs',
   date_ordered DATE NOT NULL,
   date_procured DATE NOT NULL,
+  procured_at VARCHAR(255),
   sku VARCHAR(150) UNIQUE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -73,6 +80,7 @@ CREATE TABLE IF NOT EXISTS allocations (
   remarks TEXT,
   status VARCHAR(30) NOT NULL DEFAULT 'active',
   allocated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -210,6 +218,17 @@ CREATE INDEX IF NOT EXISTS personnel_name_idx ON personnel(full_name);
 CREATE INDEX IF NOT EXISTS serialized_assets_code_idx ON serialized_assets(asset_code);
 CREATE INDEX IF NOT EXISTS assignments_personnel_idx ON asset_assignments(personnel_id);
 CREATE INDEX IF NOT EXISTS maintenance_asset_idx ON asset_maintenance(asset_id, date_reported DESC);
+
+-- Compatibility additions for databases created by earlier Smart Inventory versions.
+-- These are intentionally idempotent so the migration can be rerun before import.
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS contact_person VARCHAR(255);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS phone VARCHAR(100);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS address TEXT;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS price NUMERIC(14,2);
+ALTER TABLE items ADD COLUMN IF NOT EXISTS procured_at VARCHAR(255);
+ALTER TABLE allocations ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 -- The Express API is the only database access path. Keep these application
 -- tables inaccessible through Supabase's public Data API.
