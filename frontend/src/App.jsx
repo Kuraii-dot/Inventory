@@ -11,8 +11,6 @@ import AllItems          from './pages/AllItems.jsx';
 import Allocation        from './pages/Allocation.jsx';
 import Distributions     from './pages/Distributions.jsx';
 import Admin             from './pages/Admin.jsx';
-import Feature           from './pages/Feature.jsx';
-import AssetQr           from './pages/AssetQr.jsx';
 
 export default function App() {
   return (
@@ -24,7 +22,6 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<Login />} />
-          <Route path="/asset/:token" element={<AssetQr />} />
           <Route path="/"      element={<Navigate to="/login" replace />} />
 
           {/* Protected */}
@@ -33,7 +30,6 @@ export default function App() {
           <Route path="/allitems"      element={<ProtectedRoute><AllItems /></ProtectedRoute>} />
           <Route path="/allocation"    element={<ProtectedRoute><Allocation /></ProtectedRoute>} />
           <Route path="/distributions" element={<ProtectedRoute><Distributions /></ProtectedRoute>} />
-          <Route path="/feature"       element={<ProtectedRoute><Feature /></ProtectedRoute>} />
           <Route path="/admin"         element={<ProtectedRoute><Admin /></ProtectedRoute>} />
 
           {/* Catch-all */}
