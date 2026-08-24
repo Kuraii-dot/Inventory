@@ -325,8 +325,8 @@ export default function Items() {
 
         {/* Table */}
         <div className="app-page-panel bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table style={{ minWidth: '1300px' }} className="w-full">
+          <div className="app-table-scroll overflow-x-auto">
+            <table className="app-table-wide w-full">
               <thead>
                 <tr className="bg-gradient-to-r from-blue-600 to-slate-600 text-white">
                   {['Item Name','Category','Classification','Supplier','Qty','Unit','Unit Price','Date Ordered','Date Procured','Actions'].map(h => (
@@ -452,7 +452,8 @@ export default function Items() {
                 <p className="text-slate-400 text-sm">No deactivated items.</p>
               ) : (
                 <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
-                  <table className="w-full">
+                  <div className="app-table-scroll overflow-x-auto">
+                  <table className="app-table-medium w-full">
                     <thead>
                       <tr className="bg-slate-200 text-slate-600 text-xs uppercase">
                         {['Item Name','Category','Qty','Unit','Unit Price','Action'].map(h => (
@@ -478,6 +479,7 @@ export default function Items() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )
             )}

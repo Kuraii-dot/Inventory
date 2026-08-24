@@ -206,7 +206,7 @@ export default function Distributions() {
         <td className="py-3 px-4 text-sm text-slate-700 whitespace-nowrap">{row.category_name}</td>
         <td className="py-3 px-4 text-sm text-slate-700 whitespace-nowrap">{row.department}</td>
         <td className="py-3 px-4 text-sm text-slate-700 whitespace-nowrap">{row.recipient}</td>
-        <td className="py-3 px-4 text-sm text-slate-600 max-w-[150px] truncate">{(row.purpose ?? '').substring(0, 30)}</td>
+        <td className="min-w-[280px] py-3 px-4 text-sm text-slate-600 whitespace-normal break-words">{row.purpose || '—'}</td>
         <td className="py-3 px-4 text-sm text-slate-700 whitespace-nowrap">{row.approved_by}</td>
         <td className="py-3 px-4">
           <div className="flex gap-1 whitespace-nowrap">
@@ -290,8 +290,8 @@ export default function Distributions() {
 
         {/* Table */}
         <div className="app-page-panel bg-gradient-to-r from-orange-50 to-red-50 rounded-2xl shadow-sm border border-red-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table style={{ minWidth: '1300px' }} className="w-full">
+          <div className="app-table-scroll overflow-x-auto">
+            <table className="app-table-wide w-full">
               <thead>
                 <tr className="bg-gradient-to-r from-yellow-400 to-red-500 text-white">
                   {COLS.map(h => <th key={h} className="py-4 px-4 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">{h}</th>)}

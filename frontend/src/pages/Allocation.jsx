@@ -214,8 +214,8 @@ export default function Allocation() {
         <td className="py-3 px-6 font-semibold text-purple-600">{row.quantity}</td>
         <td className="py-3 px-6 text-sm text-slate-700">{row.department}</td>
         <td className="py-3 px-6 text-sm text-slate-700">{row.allocated_by}</td>
-        <td className="py-3 px-6 text-sm text-slate-600 max-w-xs truncate">
-          {(row.purpose ?? '').substring(0, 50)}
+        <td className="min-w-[280px] py-3 px-6 text-sm text-slate-600 whitespace-normal break-words">
+          {row.purpose || '—'}
         </td>
         <td className="py-3 px-6">
           {row.status === 'returned' && (
@@ -332,8 +332,8 @@ export default function Allocation() {
 
         {/* ── Table ──────────────────────────────────────── */}
         <div className="app-page-panel bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table style={{ minWidth: "1200px" }} className="w-full">
+          <div className="app-table-scroll overflow-x-auto">
+            <table className="app-table-wide w-full">
               <thead>
                 <tr className="bg-gradient-to-r from-pink-400 to-blue-500 text-white">
                   {COLS.map(h => (

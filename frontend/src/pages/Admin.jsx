@@ -354,8 +354,8 @@ export default function Admin() {
 
             {/* Table */}
             <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table style={{ minWidth: '900px' }} className="w-full">
+              <div className="app-table-scroll overflow-x-auto">
+                <table className="app-table-large w-full">
                   <thead>
                     <tr className="bg-slate-900 text-slate-400 text-xs uppercase">
                       {['Date','User','Action','Module','Description','IP'].map(h => (
@@ -378,7 +378,7 @@ export default function Admin() {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-slate-300 text-sm capitalize">{log.module}</td>
-                        <td className="py-3 px-4 text-slate-300 text-sm max-w-xs truncate">{log.description}</td>
+                        <td className="min-w-[320px] py-3 px-4 text-slate-300 text-sm whitespace-normal break-words">{log.description || '—'}</td>
                         <td className="py-3 px-4 text-slate-500 text-xs">{log.ip_address || '—'}</td>
                       </tr>
                     ))}
@@ -448,8 +448,8 @@ export default function Admin() {
             </div>
 
             <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table style={{ minWidth: '800px' }} className="w-full">
+              <div className="app-table-scroll overflow-x-auto">
+                <table className="app-table-medium w-full">
                   <thead>
                     <tr className="bg-slate-900 text-slate-400 text-xs uppercase">
                       {['Date','Item','Type','Source','Quantity','Performed By'].map(h => (
@@ -495,7 +495,8 @@ export default function Admin() {
             </div>
 
             <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-              <table className="w-full">
+              <div className="app-table-scroll overflow-x-auto">
+              <table className="app-table-compact w-full">
                 <thead>
                   <tr className="bg-slate-900 text-slate-400 text-xs uppercase">
                     {['ID','Username','Role','Created','Actions'].map(h => (
@@ -536,6 +537,7 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}
@@ -591,8 +593,8 @@ export default function Admin() {
 
                 {/* Activity table */}
                 <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table style={{ minWidth: '700px' }} className="w-full">
+                  <div className="app-table-scroll overflow-x-auto">
+                    <table className="app-table-medium w-full">
                       <thead>
                         <tr className="bg-slate-900 text-slate-400 text-xs uppercase">
                           {['Date','Action','Module','Description'].map(h => (

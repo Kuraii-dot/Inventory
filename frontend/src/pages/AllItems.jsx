@@ -296,7 +296,8 @@ export default function AllItems() {
 
         {/* ── Items Table ─────────────────────────────────── */}
         <div className="app-page-panel bg-gradient-to-r from-amber-50 to-sky-50 rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
-          <table style={{ minWidth: "1200px" }} className="w-full">
+          <div className="app-table-scroll overflow-x-auto">
+          <table className="app-table-large w-full">
             <thead>
               <tr className="bg-gradient-to-r from-amber-300 to-sky-600 text-white">
                 {['#', 'Item Name', 'Category', 'Total Stock', 'All-Time Distributed', 'Usage Rate'].map(h => (
@@ -411,6 +412,7 @@ export default function AllItems() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* ── Stats Cards ─────────────────────────────────── */}
@@ -572,8 +574,8 @@ export default function AllItems() {
           {invPreviewError && <p className="text-red-600 text-sm mt-2">{invPreviewError}</p>}
 
           {invPreview && (
-            <div className="mt-4 overflow-x-auto rounded-xl border border-emerald-200">
-              <table style={{ minWidth: '750px' }} className="w-full">
+            <div className="app-table-scroll mt-4 overflow-x-auto rounded-xl border border-emerald-200">
+              <table className="app-table-compact w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs uppercase">
                     {['Item Code','Item Description','Unit','In Stock','Unit Price','Amount'].map(h => (
@@ -730,8 +732,8 @@ export default function AllItems() {
 
             {/* Ledger table */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
+              <div className="app-table-scroll overflow-x-auto">
+                <table className="app-table-medium min-w-full">
                   <thead>
                     <tr className="bg-gradient-to-r from-amber-300 to-sky-600 text-white">
                       {['Date','Type','Reference','Quantity','Balance','Details'].map(h => (
