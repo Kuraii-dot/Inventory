@@ -4,6 +4,7 @@
 // React version uses state-driven toasts rendered in a portal.
 
 import { useState, useCallback } from 'react';
+import AppIcon from '../components/AppIcon.jsx';
 
 export function useToast() {
   const [toasts, setToasts] = useState([]);
@@ -35,7 +36,7 @@ export function ToastContainer({ toasts }) {
             ${t.type === 'success' ? 'bg-green-600' : 'bg-red-600'}
           `}
         >
-          {t.message}
+          <span className="flex items-center justify-center gap-2"><AppIcon name={t.type === 'success' ? 'check' : 'alert'} />{t.message}</span>
         </div>
       ))}
     </div>

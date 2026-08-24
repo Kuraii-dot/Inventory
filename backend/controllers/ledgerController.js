@@ -13,6 +13,15 @@ function fmtDate(str) {
   return str ? new Date(str).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'N/A';
 }
 
+function safeText(value) {
+  return String(value ?? '')
+    .replace(/₱/g, 'PHP ')
+    .replace(/[•·]/g, ' | ')
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ── shared data fetch ─────────────────────────────────────────
 async function buildLedgerData(item_id) {
   const itemRes = await pool.query(
@@ -40,7 +49,7 @@ async function buildLedgerData(item_id) {
     sort_date: r.date_procured || '1970-01-01',
     date: fmtDate(r.date_procured), type: 'IN',
     reference: `Procurement #${r.id}`, quantity: parseInt(r.quantity),
-    details: `₱${parseFloat(r.unit_price).toFixed(2)} / unit`,
+    details: `PHP ${parseFloat(r.unit_price).toFixed(2)} / unit`,
   }));
 
   // OUT — distributions
@@ -52,7 +61,7 @@ async function buildLedgerData(item_id) {
     sort_date: r.distributed_at || '1970-01-01',
     date: fmtDate(r.distributed_at), type: 'OUT',
     reference: `Distribution #${r.id}`, quantity: parseInt(r.quantity),
-    details: `${r.recipient} — ${r.department}`,
+    details: `${r.recipient} - ${r.department}`,
   }));
 
   // OUT / RETURN — allocations
@@ -66,7 +75,7 @@ async function buildLedgerData(item_id) {
     date: fmtDate(r.allocated_at),
     type: r.status === 'returned' ? 'RETURN' : 'OUT',
     reference: `Allocation #${r.id}`, quantity: parseInt(r.quantity),
-    details: `${r.department} — ${r.allocated_by}`,
+    details: `${r.department} - ${r.allocated_by}`,
   }));
 
   transactions.sort((a, b) => new Date(a.sort_date) - new Date(b.sort_date));
@@ -114,7 +123,7 @@ export async function exportItemLedger(req, res) {
     if (!result) return res.status(404).json({ message: 'Item not found.' });
 
     const { item_info: item, data: rows, summary } = result;
-    const subtitle = `${item.name}  •  ${item.category}  •  ${item.classification}  •  Current Stock: ${item.current_stock}`;
+    const subtitle = `${item.name} | ${item.category} | ${item.classification} | Current Stock: ${item.current_stock}`;
 
     // ── PDF ────────────────────────────────────────────────
     if (format === 'pdf') {
@@ -148,40 +157,63 @@ export async function exportItemLedger(req, res) {
         { label: 'Details',   width: 235 },
       ];
 
-      let y = 140, x;
-      // Table header
-      x = 40;
-      cols.forEach(col => {
-        doc.rect(x, y, col.width, 18).fill(COLORS.accent);
-        doc.fontSize(8).font('Helvetica-Bold').fillColor(COLORS.white).text(col.label, x + 4, y + 5, { width: col.width - 8, align: 'center' });
-        x += col.width;
-      });
-      y += 18;
+      const availableWidth = pageW - 80;
+      const widthScale = availableWidth / cols.reduce((sum, col) => sum + col.width, 0);
+      cols.forEach(col => { col.width *= widthScale; });
+
+      const drawLedgerHeader = (headerY) => {
+        let headerX = 40;
+        cols.forEach(col => {
+          doc.rect(headerX, headerY, col.width, 20).fill(COLORS.accent);
+          doc.fontSize(8).font('Helvetica-Bold').fillColor(COLORS.white)
+             .text(col.label, headerX + 4, headerY + 6, { width: col.width - 8, align: 'center', lineBreak: false });
+          headerX += col.width;
+        });
+        return headerY + 20;
+      };
+
+      const startContinuationPage = () => {
+        doc.addPage();
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.primary)
+           .text('ITEM LEDGER REPORT (CONTINUED)', 40, 36, { align: 'center', width: pageW - 80 });
+        return drawLedgerHeader(54);
+      };
+
+      let y = drawLedgerHeader(140);
 
       // Table rows
       rows.forEach((row, i) => {
-        if (y + 14 > doc.page.height - 40) { doc.addPage(); y = 50; }
+        const vals = [row.date, row.type, row.reference, String(row.quantity), String(row.balance), row.details || ''].map(safeText);
+        doc.fontSize(7.5).font('Helvetica');
+        const rowHeight = Math.min(30, Math.max(17,
+          doc.heightOfString(vals[5], { width: cols[5].width - 8 }) + 7));
+        if (y + rowHeight > doc.page.height - 76) y = startContinuationPage();
         const bg = i % 2 === 1 ? COLORS.rowAlt : COLORS.white;
-        x = 40;
-        const vals = [row.date, row.type, row.reference, String(row.quantity), String(row.balance), row.details || ''];
+        let x = 40;
         cols.forEach((col, ci) => {
-          doc.rect(x, y, col.width, 14).fill(bg);
-          doc.moveTo(x, y + 14).lineTo(x + col.width, y + 14).lineWidth(0.3).strokeColor(COLORS.border).stroke();
+          doc.rect(x, y, col.width, rowHeight).fill(bg);
+          doc.moveTo(x, y + rowHeight).lineTo(x + col.width, y + rowHeight).lineWidth(0.3).strokeColor(COLORS.border).stroke();
           const color = ci === 1
             ? (row.type === 'IN' ? '#059669' : row.type === 'RETURN' ? '#2563EB' : '#DC2626')
             : (ci === 3 ? (row.type === 'IN' || row.type === 'RETURN' ? '#059669' : '#DC2626') : COLORS.text);
-          doc.fontSize(7.5).font('Helvetica').fillColor(color).text(vals[ci], x + 3, y + 3, { width: col.width - 6, align: 'center', lineBreak: false });
+          doc.fontSize(7.5).font('Helvetica').fillColor(color).text(vals[ci] || '-', x + 3, y + 4, {
+            width: col.width - 6,
+            height: rowHeight - 7,
+            align: ci === 5 ? 'left' : 'center',
+            lineBreak: ci === 5,
+            ellipsis: true,
+          });
           x += col.width;
         });
-        y += 14;
+        y += rowHeight;
       });
 
       // Footer on all pages
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
-        doc.fontSize(7).fillColor(COLORS.muted).text('CCWD Inventory Management System', 40, doc.page.height - 28, { align: 'left', width: (pageW - 80) / 2 });
-        doc.fontSize(7).fillColor(COLORS.muted).text(`Page ${i + 1} of ${pages.count}`, 40, doc.page.height - 28, { align: 'right', width: pageW - 80 });
+        doc.fontSize(7).fillColor(COLORS.muted).text('CCWD Inventory Management System', 40, doc.page.height - 62, { align: 'left', width: (pageW - 80) / 2, lineBreak: false });
+        doc.fontSize(7).fillColor(COLORS.muted).text(`Page ${i + 1} of ${pages.count}`, 40, doc.page.height - 62, { align: 'right', width: pageW - 80, lineBreak: false });
       }
 
       doc.end();
@@ -230,16 +262,25 @@ export async function exportItemLedger(req, res) {
 
     rows.forEach((row, i) => {
       const r = sheet.addRow([row.date, row.type, row.reference, row.quantity, row.balance, row.details || '']);
-      r.height = 17;
+      r.height = 22;
       const typeColor = row.type === 'IN' ? 'FF059669' : row.type === 'RETURN' ? 'FF2563EB' : 'FFDC2626';
       const qtyColor  = (row.type === 'IN' || row.type === 'RETURN') ? 'FF059669' : 'FFDC2626';
       r.eachCell((cell, col) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 1 ? 'FFEFF6FF' : 'FFFFFFFF' } };
         cell.font = { size: 9, color: { argb: col === 2 ? typeColor : col === 4 ? qtyColor : 'FF1E293B' } };
-        cell.alignment = { vertical: 'middle' };
+        cell.alignment = { vertical: 'middle', wrapText: col === 6 };
         cell.border = { bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } } };
       });
     });
+
+    sheet.views = [{ state: 'frozen', ySplit: hRow.number, showGridLines: false }];
+    sheet.autoFilter = { from: { row: hRow.number, column: 1 }, to: { row: Math.max(hRow.number, sheet.rowCount), column: 6 } };
+    sheet.pageSetup = {
+      orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      printTitlesRow: `${hRow.number}:${hRow.number}`,
+      margins: { left: 0.3, right: 0.3, top: 0.55, bottom: 0.55, header: 0.2, footer: 0.2 },
+    };
+    sheet.headerFooter.oddFooter = '&LCCWD Inventory Management System&CConfidential&RPage &P of &N';
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="ledger_${item.name.replace(/\s+/g,'_')}.xlsx"`);

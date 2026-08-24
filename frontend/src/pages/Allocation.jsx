@@ -12,6 +12,7 @@ import Modal        from '../components/Modal.jsx';
 import GroupedTable from '../components/GroupedTable.jsx';
 import ItemRows     from '../components/ItemRows.jsx';
 import ReportModal  from '../components/ReportModal.jsx';
+import AppIcon      from '../components/AppIcon.jsx';
 
 const DEPARTMENTS = ['Admin', 'Engineering', 'Commercial', 'Finance'];
 
@@ -93,7 +94,7 @@ export default function Allocation() {
     setAllocLoading(true);
     try {
       const result = await createAllocation({ ...allocForm, items: allocItems });
-      showToast(`✅ ${result.message}`);
+      showToast(result.message);
       setShowAllocate(false);
       setAllocForm({ department: '', allocated_by: '', purpose: '', remarks: '' });
       setAllocItems([{ category_id: '', classification_id: '', item_id: '', quantity: '' }]);
@@ -162,7 +163,7 @@ export default function Allocation() {
     e.preventDefault();
     try {
       const result = await returnAllocation(returnData.id, returnForm);
-      showToast(`✅ ${result.message}`);
+      showToast(result.message);
       setReturnData(null);
       loadAllocations(page);
     } catch (err) {
@@ -185,7 +186,7 @@ export default function Allocation() {
     return (
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-blue-600">📦 {dept}</span>
+          <span className="text-blue-600 flex items-center gap-1"><AppIcon name="package" size={14} /> {dept}</span>
           <span className="px-2 py-0.5 bg-pink-200 text-pink-800 rounded-full text-xs font-medium">
             {rows.length} item{rows.length !== 1 ? 's' : ''}
           </span>
@@ -225,16 +226,16 @@ export default function Allocation() {
           <div className="flex gap-2">
             <button onClick={() => openEdit(row.id)}
               className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 text-xs font-medium">
-              ✏️ Edit
+              <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
             </button>
             <button onClick={() => handleDelete(row.id)}
               className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium">
-              🗑️
+              <AppIcon name="trash" size={13} />
             </button>
             {row.status === 'active' && (
               <button onClick={() => openReturn(row.id)}
                 className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-medium">
-                ↩️
+                <AppIcon name="return" size={13} />
               </button>
             )}
           </div>
@@ -246,31 +247,31 @@ export default function Allocation() {
   const inputCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-violet-50">
-      <div className="max-w-screen-xl mx-auto px-8 py-10">
+    <div className="app-page min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-violet-50">
+      <div className="app-page-inner max-w-screen-xl mx-auto px-8 py-10">
 
         {/* ── Header ─────────────────────────────────────── */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="app-page-header flex justify-between items-start mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-pink-400 bg-clip-text text-transparent mb-2">
               Office Item Allocations
             </h1>
             <p className="text-slate-500 text-sm">Allocate and track office supplies across departments</p>
           </div>
-          <div className="flex gap-3">
+          <div className="app-page-actions flex gap-3">
             <button onClick={() => setShowReport(true)}
               className="px-5 py-2.5 bg-white text-purple-600 font-medium rounded-xl border-2 border-purple-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>📊</span><span>Generate Report</span>
+              <AppIcon name="report" /><span>Generate Report</span>
             </button>
             <button onClick={() => setShowAllocate(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-pink-400 to-blue-500 text-white border-2 border-pink-400 font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span className="text-lg">+</span><span>Allocate Items</span>
+              className="app-primary-button px-6 py-2.5 bg-gradient-to-r from-pink-400 to-blue-500 text-white border-2 border-pink-400 font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+              <AppIcon name="plus" /><span>Allocate Items</span>
             </button>
           </div>
         </div>
 
         {/* ── Search & Filters ───────────────────────────── */}
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-sm border border-pink-100 p-6 mb-6">
+        <div className="app-page-panel bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-sm border border-pink-100 p-6 mb-6">
           <form onSubmit={handleSearch} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
@@ -280,7 +281,7 @@ export default function Allocation() {
                     onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
                     placeholder="Search by item, department, or allocated by..."
                     className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition" />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                  <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
               <div>
@@ -299,7 +300,7 @@ export default function Allocation() {
               <div className="flex items-end">
                 <button type="submit"
                   className="w-full bg-gradient-to-r from-blue-400 to-pink-400 text-white py-2.5 px-4 rounded-lg font-medium hover:shadow-lg transition-all duration-300 hover:scale-105">
-                  🔎 Search
+                  <AppIcon name="search" size={15} className="app-icon-inline mr-1" /> Search
                 </button>
               </div>
             </div>
@@ -330,7 +331,7 @@ export default function Allocation() {
         </div>
 
         {/* ── Table ──────────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
+        <div className="app-page-panel bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl shadow-sm border border-pink-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table style={{ minWidth: "1200px" }} className="w-full">
               <thead>
@@ -385,7 +386,7 @@ export default function Allocation() {
         <form onSubmit={handleAllocateSubmit} className="space-y-5">
           <div className="p-5 bg-gradient-to-r from-pink-50 to-violet-50 rounded-xl border border-purple-200">
             <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-              <span>📋</span><span>Allocation Information</span>
+              <AppIcon name="clipboard" /><span>Allocation Information</span>
             </h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
@@ -422,7 +423,7 @@ export default function Allocation() {
 
           <div>
             <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-              <span>📦</span><span>Items to Allocate</span>
+              <AppIcon name="package" /><span>Items to Allocate</span>
             </h3>
             <ItemRows value={allocItems} onChange={setAllocItems} showClassification={false} />
           </div>

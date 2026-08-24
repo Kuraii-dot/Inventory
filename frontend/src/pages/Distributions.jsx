@@ -13,6 +13,7 @@ import ItemRows     from '../components/ItemRows.jsx';
 import ReportModal  from '../components/ReportModal.jsx';
 import CombinationsModal from '../components/distributions/CombinationsModal.jsx';
 import client       from '../api/client.js';
+import AppIcon      from '../components/AppIcon.jsx';
 
 const DEPARTMENTS = ['Admin', 'Engineering', 'Commercial', 'Finance'];
 
@@ -112,7 +113,7 @@ export default function Distributions() {
         };
       }));
       setDistItems(mapped);
-      showToast(`✅ Loaded "${combo.name}"`, 'success');
+      showToast(`Loaded "${combo.name}"`, 'success');
     } catch (err) {
       console.error('Load combo error:', err);
       showToast('Error loading combination items.', 'error');
@@ -126,7 +127,7 @@ export default function Distributions() {
     setDistLoading(true);
     try {
       const result = await createDistribution({ ...distForm, items: distItems });
-      showToast(`✅ ${result.message} | Value: ₱${result.total_value?.toFixed(2)}`);
+      showToast(`${result.message} | Value: ₱${result.total_value?.toFixed(2)}`);
       setShowDistribute(false);
       setDistForm({ recipient: '', department: '', approved_by: '', purpose: '', debit_to: '', date: today, time: nowTime });
       setDistItems([{ category_id: '', classification_id: '', item_id: '', quantity: '' }]);
@@ -171,7 +172,7 @@ export default function Distributions() {
     e.preventDefault();
     try {
       const result = await returnDistribution(returnData.id, returnForm);
-      showToast(`✅ ${result.message}`); setReturnData(null); loadDistributions(page);
+      showToast(result.message); setReturnData(null); loadDistributions(page);
     } catch (err) { showToast(err.response?.data?.message || 'Error.', 'error'); }
   }
 
@@ -185,7 +186,7 @@ export default function Distributions() {
     return (
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-red-600">📦 {purpose}</span>
+          <span className="text-red-600 flex items-center gap-1"><AppIcon name="package" size={14} /> {purpose}</span>
           <span className="px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full text-xs font-medium">{rows.length} item{rows.length !== 1 ? 's' : ''}</span>
           <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">Qty: {totalQty}</span>
           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">₱{totalValue.toFixed(2)}</span>
@@ -209,9 +210,9 @@ export default function Distributions() {
         <td className="py-3 px-4 text-sm text-slate-700 whitespace-nowrap">{row.approved_by}</td>
         <td className="py-3 px-4">
           <div className="flex gap-1 whitespace-nowrap">
-            <button onClick={() => openEdit(row.id)} className="px-2 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 text-xs font-medium">✏️ Edit</button>
-            <button onClick={() => handleDelete(row.id)} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium">🗑️ Delete</button>
-            <button onClick={() => openReturn(row.id)} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-medium">↩️ Return</button>
+            <button onClick={() => openEdit(row.id)} className="px-2 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 text-xs font-medium"><AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit</button>
+            <button onClick={() => handleDelete(row.id)} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium"><AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete</button>
+            <button onClick={() => openReturn(row.id)} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-medium"><AppIcon name="return" size={13} className="app-icon-inline mr-1" /> Return</button>
           </div>
         </td>
       </>
@@ -221,37 +222,37 @@ export default function Distributions() {
   const inputCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-yellow-50 to-red-100">
-      <div className="max-w-[1600px] mx-auto px-8 py-10">
+    <div className="app-page min-h-screen bg-gradient-to-br from-red-50 via-yellow-50 to-red-100">
+      <div className="app-page-inner max-w-[1600px] mx-auto px-8 py-10">
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="app-page-header flex justify-between items-start mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-600 to-red-600 bg-clip-text text-transparent mb-2">Distribution Records</h1>
             <p className="text-slate-500 text-sm">Track and manage item distributions across departments</p>
           </div>
-          <div className="flex gap-3">
+          <div className="app-page-actions flex gap-3">
             <button onClick={() => setShowReport(true)} className="px-5 py-2.5 bg-yellow-50 text-red-600 font-medium rounded-xl border-2 border-yellow-600 hover:border-red-600 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>📊</span><span>Generate Report</span>
+              <AppIcon name="report" /><span>Generate Report</span>
             </button>
             <button onClick={() => setShowCombinations(true)} className="px-5 py-2.5 bg-yellow-50 text-red-600 font-medium rounded-xl border-2 border-yellow-600 hover:border-red-600 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>📂</span><span>Combinations</span>
+              <AppIcon name="layers" /><span>Combinations</span>
             </button>
-            <button onClick={openDistributeModal} className="px-6 py-2.5 bg-gradient-to-r from-yellow-500 to-red-500 text-white border-2 border-yellow-600 font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span className="text-lg">+</span><span>Distribute Item</span>
+            <button onClick={openDistributeModal} className="app-primary-button px-6 py-2.5 bg-gradient-to-r from-yellow-500 to-red-500 text-white border-2 border-yellow-600 font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+              <AppIcon name="plus" /><span>Distribute Item</span>
             </button>
           </div>
         </div>
 
         {/* Search */}
-        <div className="bg-gradient-to-r from-red-50 to-yellow-50 rounded-2xl shadow-sm border border-yellow-200 p-6 mb-6">
+        <div className="app-page-panel bg-gradient-to-r from-red-50 to-yellow-50 rounded-2xl shadow-sm border border-yellow-200 p-6 mb-6">
           <form onSubmit={handleSearch} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-2">Search Distribution</label>
                 <div className="relative">
                   <input type="text" value={filters.search} onChange={e => setFilters(f => ({...f, search: e.target.value}))} placeholder="Search by item, department, or recipient..." className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-300 focus:border-transparent transition"/>
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                  <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
               </div>
               <div>
@@ -266,7 +267,7 @@ export default function Distributions() {
                 </select>
               </div>
               <div className="flex items-end">
-                <button type="submit" className="w-full bg-gradient-to-r from-yellow-400 to-red-400 text-white py-2.5 px-4 rounded-lg font-medium hover:shadow-lg transition-all duration-300 hover:scale-105">🔎 Search</button>
+                <button type="submit" className="w-full bg-gradient-to-r from-yellow-400 to-red-400 text-white py-2.5 px-4 rounded-lg font-medium hover:shadow-lg transition-all duration-300 hover:scale-105"><AppIcon name="search" size={15} className="app-icon-inline mr-1" /> Search</button>
               </div>
             </div>
             {filters.timeframe === 'custom' && (
@@ -288,7 +289,7 @@ export default function Distributions() {
         </div>
 
         {/* Table */}
-        <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-2xl shadow-sm border border-red-100 overflow-hidden">
+        <div className="app-page-panel bg-gradient-to-r from-orange-50 to-red-50 rounded-2xl shadow-sm border border-red-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table style={{ minWidth: '1300px' }} className="w-full">
               <thead>
@@ -321,7 +322,7 @@ export default function Distributions() {
       <Modal open={showDistribute} onClose={() => { setShowDistribute(false); setSelectedCombo(''); }} title="Distribute Items" subtitle="Record a new item distribution" maxWidth="max-w-3xl">
         <form onSubmit={handleDistributeSubmit} className="space-y-5">
           <div className="p-5 bg-gradient-to-r from-yellow-50 to-red-50 rounded-xl border border-red-200">
-            <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><span>📋</span><span>Distribution Information</span></h3>
+            <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><AppIcon name="clipboard" /><span>Distribution Information</span></h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">To Whom *</label>
@@ -364,7 +365,7 @@ export default function Distributions() {
           {/* Combinations Picker */}
           <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-300">
             <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-              <span>📂</span><span>Load from Combination <span className="font-normal text-slate-400">(Optional)</span></span>
+              <AppIcon name="layers" /><span>Load from Combination <span className="font-normal text-slate-400">(Optional)</span></span>
             </label>
             {comboLoading ? (
               <p className="text-sm text-slate-400 animate-pulse">Loading combinations...</p>
@@ -381,14 +382,14 @@ export default function Distributions() {
                 </select>
                 <button type="button" disabled={!selectedCombo} onClick={handleLoadCombo}
                   className="px-4 py-2.5 bg-gradient-to-r from-yellow-400 to-red-400 text-white font-medium rounded-lg hover:shadow-md transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
-                  <span>⚡</span><span>Load Items</span>
+                  <AppIcon name="zap" /><span>Load Items</span>
                 </button>
               </div>
             )}
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><span>📦</span><span>Items to Distribute</span></h3>
+            <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2"><AppIcon name="package" /><span>Items to Distribute</span></h3>
             <ItemRows value={distItems} onChange={setDistItems} showClassification={true}/>
           </div>
 

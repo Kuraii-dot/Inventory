@@ -71,7 +71,7 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
   const inputCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
 
   return (
-    <Modal open={open} onClose={onClose} title="✏️ Edit Item">
+    <Modal open={open} onClose={onClose} title="Edit Item">
       {fetching ? (
         // mirrors: <div class='text-center text-slate-500'>Loading...</div>
         <div className="text-center py-10 text-slate-500 animate-pulse">Loading...</div>

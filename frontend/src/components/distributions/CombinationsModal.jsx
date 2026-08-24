@@ -11,6 +11,7 @@ import {
   fetchCombinationById,
 } from '../../api/combinations.js';
 import { fetchCategories, fetchItemsByCategory } from '../../api/items.js';
+import AppIcon from '../AppIcon.jsx';
 
 // Simple item selector row — category → item → quantity
 // No classification needed since combination_items doesn't store it
@@ -120,7 +121,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
         description: newDesc.trim(),
         items: newItems.map(i => ({ item_id: i.item_id, quantity_required: parseInt(i.quantity_required) })),
       });
-      showToast(`✅ "${newName}" saved!`, 'success');
+      showToast(`"${newName}" saved!`, 'success');
       setNewName(''); setNewDesc('');
       setNewItems([{ ...EMPTY_ROW }]);
       loadCombinations();
@@ -157,7 +158,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
         description: editDesc.trim(),
         items: editItems.map(i => ({ item_id: i.item_id, quantity_required: parseInt(i.quantity_required) })),
       });
-      showToast(`✅ "${editName}" updated!`, 'success');
+      showToast(`"${editName}" updated!`, 'success');
       setEditCombo(null);
       loadCombinations();
     } catch (err) {
@@ -170,7 +171,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
     if (!confirm(`Delete combination "${name}"?`)) return;
     try {
       await deleteCombination(id);
-      showToast(`✅ "${name}" deleted.`, 'success');
+      showToast(`"${name}" deleted.`, 'success');
       loadCombinations();
     } catch { showToast('Error deleting.', 'error'); }
   }
@@ -193,7 +194,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
           </div>
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-700">📦 Items</h3>
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2"><AppIcon name="package" /> Items</h3>
               <button type="button" onClick={() => addRow(editItems, setEditItems)}
                 className="px-3 py-1.5 bg-yellow-100 text-red-700 rounded-lg hover:bg-yellow-200 text-xs font-medium">
                 + Add Item
@@ -228,7 +229,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
       {/* ── Existing list ─────────────────────────────────── */}
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-          <span>📂</span><span>Existing Combinations</span>
+          <AppIcon name="layers" /><span>Existing Combinations</span>
         </h3>
         {loading ? (
           <div className="text-center py-6 text-slate-400 animate-pulse">Loading...</div>
@@ -241,7 +242,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-slate-800">📂 {combo.name}</span>
+                      <span className="font-semibold text-slate-800 flex items-center gap-1"><AppIcon name="layers" size={14} /> {combo.name}</span>
                       <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
                         {combo.item_count} item{combo.item_count !== 1 ? 's' : ''}
                       </span>
@@ -260,11 +261,11 @@ export default function CombinationsModal({ open, onClose, showToast }) {
                   <div className="flex gap-2 ml-4 flex-shrink-0">
                     <button onClick={() => openEdit(combo.id)}
                       className="px-3 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 text-xs font-medium">
-                      ✏️ Edit
+                      <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                     </button>
                     <button onClick={() => handleDelete(combo.id, combo.name)}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium">
-                      🗑️ Delete
+                      <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                     </button>
                   </div>
                 </div>
@@ -278,7 +279,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
 
       {/* ── Create new ────────────────────────────────────── */}
       <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-        <span>➕</span><span>Create New Combination</span>
+        <AppIcon name="plus" /><span>Create New Combination</span>
       </h3>
 
       <form onSubmit={handleCreate} className="space-y-5">
@@ -294,11 +295,11 @@ export default function CombinationsModal({ open, onClose, showToast }) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <span>📦</span><span>Items in Combination</span>
+              <AppIcon name="package" /><span>Items in Combination</span>
             </h3>
             <button type="button" onClick={() => addRow(newItems, setNewItems)}
               className="px-4 py-2 bg-yellow-100 text-red-700 rounded-lg hover:bg-yellow-200 text-sm font-medium flex items-center gap-2">
-              <span>+</span><span>Add Item</span>
+              <AppIcon name="plus" /><span>Add Item</span>
             </button>
           </div>
           <div className="space-y-3">

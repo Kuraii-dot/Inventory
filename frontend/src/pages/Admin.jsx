@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast, ToastContainer } from '../hooks/useToast.jsx';
 import Modal from '../components/Modal.jsx';
+import AppIcon from '../components/AppIcon.jsx';
 import {
   fetchAdminStats, fetchActivityLog, fetchItemMovement,
   fetchUserReport, fetchUsers, createUser, updateUser, deleteUser,
@@ -166,7 +167,7 @@ export default function Admin() {
     setUserLoading(true);
     try {
       await createUser(userForm);
-      showToast(`✅ User "${userForm.username}" created!`, 'success');
+      showToast(`User "${userForm.username}" created!`, 'success');
       setShowAddUser(false);
       setUserForm({ username: '', password: '', role: 'admin' });
       loadUsers();
@@ -180,7 +181,7 @@ export default function Admin() {
     setUserLoading(true);
     try {
       await updateUser(editUser.id, userForm);
-      showToast(`✅ User updated!`, 'success');
+      showToast('User updated!', 'success');
       setEditUser(null);
       setUserForm({ username: '', password: '', role: 'admin' });
       loadUsers();
@@ -193,7 +194,7 @@ export default function Admin() {
     if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
     try {
       await deleteUser(id);
-      showToast(`✅ User "${username}" deleted.`, 'success');
+      showToast(`User "${username}" deleted.`, 'success');
       loadUsers();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error deleting user.', 'error');
@@ -208,22 +209,22 @@ export default function Admin() {
   const inputCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
 
   const TABS = [
-    { id: 'overview',  label: '📊 Overview'       },
-    { id: 'activity',  label: '📋 Activity Log'    },
-    { id: 'movement',  label: '📦 Item Movement'   },
-    { id: 'users',     label: '👥 User Management' },
-    { id: 'reports',   label: '📄 User Reports'    },
+    { id: 'overview',  label: 'Overview', icon: 'barChart' },
+    { id: 'activity',  label: 'Activity Log', icon: 'clipboard' },
+    { id: 'movement',  label: 'Item Movement', icon: 'package' },
+    { id: 'users',     label: 'User Management', icon: 'users' },
+    { id: 'reports',   label: 'User Reports', icon: 'fileChart' },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
-      <div className="max-w-screen-xl mx-auto px-8 py-10">
+    <div className="app-page app-page-admin min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+      <div className="app-page-inner max-w-screen-xl mx-auto px-8 py-10">
 
         {/* Header */}
-        <div className="mb-8">
+        <div className="app-page-header mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-2xl">🛡️</span>
+              <AppIcon name="shield" size={23} />
             </div>
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
@@ -243,7 +244,7 @@ export default function Admin() {
                   ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}>
-              {tab.label}
+              <span className="flex items-center gap-2"><AppIcon name={tab.icon} size={15} />{tab.label}</span>
             </button>
           ))}
         </div>
@@ -254,14 +255,14 @@ export default function Admin() {
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {[
-                { icon: '👥', label: 'Total Users',     value: stats?.total_users      ?? '—', color: 'from-blue-500 to-blue-600'    },
-                { icon: '📋', label: 'Total Actions',   value: stats?.total_actions    ?? '—', color: 'from-purple-500 to-purple-600' },
-                { icon: '⚡', label: 'Actions Today',   value: stats?.actions_today    ?? '—', color: 'from-emerald-500 to-emerald-600' },
-                { icon: '🔥', label: 'Top Module',      value: stats?.top_modules?.[0]?.module ?? '—', color: 'from-amber-500 to-amber-600' },
+                { icon: 'users', label: 'Total Users',     value: stats?.total_users      ?? '—', color: 'from-blue-500 to-blue-600'    },
+                { icon: 'clipboard', label: 'Total Actions',   value: stats?.total_actions    ?? '—', color: 'from-purple-500 to-purple-600' },
+                { icon: 'zap', label: 'Actions Today',   value: stats?.actions_today    ?? '—', color: 'from-emerald-500 to-emerald-600' },
+                { icon: 'barChart', label: 'Top Module',      value: stats?.top_modules?.[0]?.module ?? '—', color: 'from-amber-500 to-amber-600' },
               ].map(s => (
                 <div key={s.label} className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
                   <div className={`w-12 h-12 bg-gradient-to-br ${s.color} rounded-xl flex items-center justify-center mb-4 shadow-md`}>
-                    <span className="text-2xl">{s.icon}</span>
+                    <AppIcon name={s.icon} size={22} />
                   </div>
                   <p className="text-slate-400 text-sm">{s.label}</p>
                   <p className="text-3xl font-bold text-white mt-1">{s.value}</p>
@@ -272,7 +273,7 @@ export default function Admin() {
             {/* Top Modules */}
             {stats?.top_modules?.length > 0 && (
               <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-                <h3 className="text-white font-semibold mb-4">🔥 Most Active Modules</h3>
+                <h3 className="text-white font-semibold mb-4 flex items-center gap-2"><AppIcon name="barChart" /> Most Active Modules</h3>
                 <div className="space-y-3">
                   {stats.top_modules.map(m => (
                     <div key={m.module} className="flex items-center justify-between">
@@ -427,7 +428,7 @@ export default function Admin() {
                 <div className="flex items-end">
                   <button onClick={loadMovements}
                     className="w-full px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-lg hover:shadow-lg transition-all text-sm">
-                    🔎 Search
+                    <AppIcon name="search" size={15} className="app-icon-inline mr-1" /> Search
                   </button>
                 </div>
               </div>
@@ -436,11 +437,11 @@ export default function Admin() {
                 <div className="flex gap-2">
                   <button onClick={() => handleMovExport('pdf')} disabled={movExporting}
                     className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-60">
-                    <span>📄</span><span>{movExporting ? 'Exporting...' : 'Export PDF'}</span>
+                    <AppIcon name="file" /><span>{movExporting ? 'Exporting...' : 'Export PDF'}</span>
                   </button>
                   <button onClick={() => handleMovExport('excel')} disabled={movExporting}
                     className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-60">
-                    <span>📊</span><span>{movExporting ? 'Exporting...' : 'Export Excel'}</span>
+                    <AppIcon name="report" /><span>{movExporting ? 'Exporting...' : 'Export Excel'}</span>
                   </button>
                 </div>
               </div>
@@ -489,7 +490,7 @@ export default function Admin() {
               <span className="text-slate-300 text-sm">{users.length} user{users.length !== 1 ? 's' : ''}</span>
               <button onClick={() => { setShowAddUser(true); setUserForm({ username: '', password: '', role: 'admin' }); }}
                 className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-                <span>+</span><span>Add User</span>
+                <AppIcon name="plus" /><span>Add User</span>
               </button>
             </div>
 
@@ -521,12 +522,12 @@ export default function Admin() {
                         <div className="flex gap-2">
                           <button onClick={() => openEditUser(u)}
                             className="px-3 py-1.5 bg-amber-900/50 text-amber-400 rounded-lg hover:bg-amber-900 text-xs font-medium">
-                            ✏️ Edit
+                            <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                           </button>
                           {u.id !== user.id && (
                             <button onClick={() => handleDeleteUser(u.id, u.username)}
                               className="px-3 py-1.5 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900 text-xs font-medium">
-                              🗑️ Delete
+                              <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                             </button>
                           )}
                         </div>
@@ -554,7 +555,7 @@ export default function Admin() {
                 </div>
                 <button onClick={loadUserReport} disabled={!reportUser || reportLoading}
                   className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
-                  {reportLoading ? 'Loading...' : '🔍 Generate Report'}
+                  <AppIcon name={reportLoading ? 'refresh' : 'fileChart'} size={15} className={`app-icon-inline mr-1 ${reportLoading ? 'animate-spin' : ''}`} />{reportLoading ? 'Loading...' : 'Generate Report'}
                 </button>
               </div>
             </div>
@@ -565,7 +566,7 @@ export default function Admin() {
                 <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                      <span className="text-2xl">👤</span>
+                      <AppIcon name="user" size={23} />
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold text-white">{reportData.user.username}</h3>

@@ -1,380 +1,183 @@
-// frontend/src/pages/Dashboard.jsx
-// Converted from: pages/dashboard.php
-//
-// PHP: server-side PHP queries → inline <script> with json_encode() → Chart.js
-// React: useEffect API call → useState → Chart.js via useEffect on canvas ref
-//
-// Key conversions:
-//   <?= $totalItems ?>            → stats.total_items
-//   json_encode($categoryLabels)  → chart_data.labels
-//   json_encode($itemCounts)      → chart_data.item_counts
-//   new Chart(canvas, config)     → useEffect with Chart.js instance
-
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Chart from 'chart.js/auto';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchDashboardData } from '../api/dashboard.js';
-import Chart from 'chart.js/auto';
+import AppIcon from '../components/AppIcon.jsx';
+import './Dashboard.css';
 
-// ── Stat Card ────────────────────────────────────────────────
-function StatCard({ icon, label, value, badge, badgeColor, accentColor, note, noteColor, popup }) {
-  const [showPopup, setShowPopup] = useState(false);
+const numberFormat = new Intl.NumberFormat('en-PH');
+const pesoFormat = new Intl.NumberFormat('en-PH', {
+  style: 'currency', currency: 'PHP', minimumFractionDigits: 2, maximumFractionDigits: 2,
+});
 
+function MiniBars({ values }) {
+  const normalized = values?.length ? values.slice(0, 8) : [0, 0, 0, 0, 0, 0];
+  const max = Math.max(...normalized, 1);
   return (
-    <div
-      className="group relative bg-white rounded-2xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:scale-105 overflow-visible cursor-pointer"
-      onMouseEnter={() => popup && setShowPopup(true)}
-      onMouseLeave={() => setShowPopup(false)}
-      onClick={() => popup && setShowPopup(v => !v)}
-    >
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${accentColor} rounded-full -mr-16 -mt-16`} />
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`w-12 h-12 bg-gradient-to-br ${accentColor.replace('/10', '')} rounded-xl flex items-center justify-center shadow-md`}>
-            <span className="text-white text-xl">{icon}</span>
-          </div>
-          <span className={`text-xs font-medium ${badgeColor} px-3 py-1 rounded-full`}>{badge}</span>
-        </div>
-        <h2 className="text-sm font-medium text-slate-500 mb-1">{label}</h2>
-        <p className="text-3xl font-bold text-slate-800">{value}</p>
-        <div className={`mt-3 flex items-center text-xs ${noteColor ?? 'text-slate-500'}`}>{note}</div>
-        {popup && (
-          <div className="mt-2 text-xs text-amber-600 font-medium flex items-center gap-1">
-            <span>👁</span><span>Hover to see items</span>
-          </div>
-        )}
-      </div>
-
-      {/* Popup panel */}
-      {popup && showPopup && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-amber-200 z-50 overflow-hidden">
-          <div className="bg-gradient-to-r from-amber-500 to-red-500 px-4 py-3">
-            <p className="text-white font-semibold text-sm">⚠️ Low Stock Items</p>
-            <p className="text-amber-100 text-xs">Items with quantity below 10</p>
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {popup.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-6">All items are well stocked! ✅</p>
-            ) : popup.map((item, i) => (
-              <div key={i} className={`flex items-center justify-between px-4 py-3 border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                <div>
-                  <p className="text-sm font-medium text-slate-800">{item.name}</p>
-                  <p className="text-xs text-slate-400">{item.category}</p>
-                </div>
-                <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                  item.quantity === 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {item.quantity === 0 ? 'Out of stock' : `${item.quantity} left`}
-                </span>
-              </div>
-            ))}
-          </div>
-          {popup.length > 0 && (
-            <div className="px-4 py-2 bg-amber-50 border-t border-amber-100">
-              <p className="text-xs text-amber-600 text-center">{popup.length} item{popup.length !== 1 ? 's' : ''} need restocking</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+    <span className="inventory-mini-bars" aria-hidden="true">
+      {normalized.map((value, index) => <i key={index} style={{ height: `${Math.max((value / max) * 100, 12)}%` }} />)}
+    </span>
   );
+}
+
+function MetricCard({ label, value, note, icon, tone, values, onClick }) {
+  return (
+    <button type="button" className={`inventory-kpi inventory-kpi-${tone}`} onClick={onClick}>
+      <span className="inventory-kpi-top">
+        <span className="inventory-kpi-icon"><AppIcon name={icon} size={18} /></span>
+        <span className="inventory-arrow"><AppIcon name="arrowRight" size={17} /></span>
+      </span>
+      <span className="inventory-kpi-copy"><span>{label}</span><strong>{value}</strong><small>{note}</small></span>
+      <MiniBars values={values} />
+    </button>
+  );
+}
+
+function DashboardSkeleton() {
+  return <div className="inventory-loading" aria-label="Loading dashboard">{Array.from({ length: 4 }).map((_, index) => <span key={index} />)}</div>;
 }
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-
-  const [data,    setData]    = useState(null);
+  const categoryChartRef = useRef(null);
+  const stockChartRef = useRef(null);
+  const categoryChartInstance = useRef(null);
+  const stockChartInstance = useRef(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [error, setError] = useState('');
+  const [showLowStock, setShowLowStock] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('inventory_dashboard_theme') === 'dark' ? 'dark' : 'light');
+  const [now, setNow] = useState(() => new Date());
 
-  // Chart refs — mirrors: document.getElementById('itemsByCategoryChart')
-  const barChartRef  = useRef(null);
-  const pieChartRef  = useRef(null);
-  const barInstance  = useRef(null);
-  const pieInstance  = useRef(null);
-
-  // Fetch data — mirrors: the PHP queries at the top of dashboard.php
   useEffect(() => {
+    let active = true;
     fetchDashboardData()
-      .then(setData)
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      .then((result) => { if (active) setData(result); })
+      .catch((err) => { if (active) setError(err.message || 'The dashboard could not be loaded.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
-  // Build charts — mirrors: the two `new Chart(...)` calls in dashboard.php <script>
   useEffect(() => {
-    if (!data?.chart_data || !barChartRef.current || !pieChartRef.current) return;
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
-    const { labels, item_counts, stock_counts } = data.chart_data;
+  useEffect(() => { localStorage.setItem('inventory_dashboard_theme', theme); }, [theme]);
 
-    // Destroy old instances to avoid "canvas already in use" error
-    barInstance.current?.destroy();
-    pieInstance.current?.destroy();
+  useEffect(() => {
+    if (!data?.chart_data || !categoryChartRef.current || !stockChartRef.current) return undefined;
+    const { labels = [], item_counts = [], stock_counts = [] } = data.chart_data;
+    const dark = theme === 'dark';
+    const labelColor = dark ? '#9fb1cf' : '#607395';
+    const gridColor = dark ? 'rgba(127,154,196,.14)' : 'rgba(148,163,184,.14)';
 
-    // ── Bar Chart: Items per Category ────────────────────────────
-    // mirrors: new Chart(document.getElementById('itemsByCategoryChart'), { type: 'bar', ... })
-    barInstance.current = new Chart(barChartRef.current, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Items',
-          data: item_counts,
-          backgroundColor: 'rgba(59, 130, 246, 0.8)',
-          borderRadius: 8,
-          borderWidth: 0,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            padding: 12,
-            borderRadius: 8,
-            titleColor: '#fff',
-            bodyColor: '#cbd5e1',
-            borderColor: 'rgba(148, 163, 184, 0.2)',
-            borderWidth: 1,
-          },
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: { stepSize: 1, color: '#64748b', font: { size: 11 } },
-            grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false },
-          },
-          x: {
-            ticks: { color: '#64748b', font: { size: 11 } },
-            grid: { display: false },
-          },
-        },
-      },
-    });
-
-    // ── Doughnut Chart: Stock Distribution ───────────────────────
-    // mirrors: new Chart(document.getElementById('stockDistributionChart'), { type: 'doughnut', ... })
-    pieInstance.current = new Chart(pieChartRef.current, {
+    categoryChartInstance.current?.destroy();
+    stockChartInstance.current?.destroy();
+    categoryChartInstance.current = new Chart(categoryChartRef.current, {
       type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data: stock_counts,
-          backgroundColor: ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#84CC16'],
-          borderWidth: 0,
-          spacing: 2,
-        }],
-      },
+      data: { labels, datasets: [{ data: item_counts, backgroundColor: ['#1766ef','#11b981','#f3a51f','#6d5ce7','#00a9c5','#ef5b6a','#86a6d5'], borderColor: dark ? '#13213a' : '#ffffff', borderWidth: 3, hoverOffset: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '69%', plugins: { legend: { display: false }, tooltip: { backgroundColor: dark ? '#0a1324' : '#10244b', padding: 11, cornerRadius: 8, displayColors: true } } },
+    });
+    stockChartInstance.current = new Chart(stockChartRef.current, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Units in stock', data: stock_counts, backgroundColor: '#1766ef', hoverBackgroundColor: '#0b53d0', borderRadius: 7, borderSkipped: false, maxBarThickness: 58 }] },
       options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: {
-              padding: 15,
-              usePointStyle: true,
-              pointStyle: 'circle',
-              font: { size: 11 },
-              color: '#64748b',
-            },
-          },
-          tooltip: {
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            padding: 12,
-            borderRadius: 8,
-            titleColor: '#fff',
-            bodyColor: '#cbd5e1',
-            borderColor: 'rgba(148, 163, 184, 0.2)',
-            borderWidth: 1,
-          },
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: dark ? '#0a1324' : '#10244b', padding: 11, cornerRadius: 8 } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: labelColor, precision: 0, font: { size: 10 } }, grid: { color: gridColor }, border: { display: false } },
+          x: { ticks: { color: labelColor, font: { size: 10 }, maxRotation: 0, autoSkip: true }, grid: { display: false }, border: { display: false } },
         },
-        cutout: '65%',
       },
     });
+    return () => { categoryChartInstance.current?.destroy(); stockChartInstance.current?.destroy(); };
+  }, [data, theme]);
 
-    // Cleanup on unmount
-    return () => {
-      barInstance.current?.destroy();
-      pieInstance.current?.destroy();
-    };
-  }, [data]);
+  const stats = data?.stats ?? {};
+  const labels = data?.chart_data?.labels ?? [];
+  const itemCounts = data?.chart_data?.item_counts ?? [];
+  const stockCounts = data?.chart_data?.stock_counts ?? [];
+  const recentItems = data?.recent_items ?? [];
+  const lowStockItems = data?.low_stock_items_list ?? [];
+  const healthyItems = Math.max((stats.total_items ?? 0) - (stats.low_stock_items ?? 0), 0);
+  const totalStock = stockCounts.reduce((sum, value) => sum + value, 0);
+  const legendRows = useMemo(() => labels.map((label, index) => ({
+    label, value: itemCounts[index] ?? 0,
+    color: ['#1766ef','#11b981','#f3a51f','#6d5ce7','#00a9c5','#ef5b6a','#86a6d5'][index % 7],
+  })), [labels, itemCounts]);
+  const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening';
+  const firstName = user?.full_name?.split(' ')[0] || user?.name?.split(' ')[0] || user?.username || 'User';
+  const dateLabel = now.toLocaleDateString('en-PH', { month: 'short', day: '2-digit', year: 'numeric' });
+  const metrics = [
+    { label: 'Total Items', value: numberFormat.format(stats.total_items ?? 0), note: 'Active inventory records', icon: 'package', tone: 'blue', route: '/allitems', values: itemCounts },
+    { label: 'Categories', value: numberFormat.format(stats.total_categories ?? 0), note: 'Organized stock groups', icon: 'categories', tone: 'green', route: '/allitems', values: itemCounts.slice().reverse() },
+    { label: 'Low Stock', value: numberFormat.format(stats.low_stock_items ?? 0), note: stats.low_stock_items ? 'Items need attention' : 'Stock levels look healthy', icon: 'alert', tone: 'amber', action: () => setShowLowStock(true), values: lowStockItems.map((item) => item.quantity) },
+    { label: 'Inventory Value', value: pesoFormat.format(stats.total_value ?? 0), note: 'Current total worth', icon: 'barChart', tone: 'violet', route: '/allitems', values: stockCounts },
+  ];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-yellow-50 to-slate-100 flex items-center justify-center">
-        <div className="text-slate-500 animate-pulse text-lg">Loading dashboard...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-yellow-50 to-slate-100 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-500 font-medium mb-2">Failed to load dashboard</p>
-          <p className="text-slate-400 text-sm">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { stats, recent_items } = data;
+  if (error) return (
+    <main className="inventory-dashboard inventory-dashboard-error"><div><span><AppIcon name="alert" size={22} /></span><h1>Dashboard unavailable</h1><p>{error}</p><button type="button" onClick={() => window.location.reload()}>Try again</button></div></main>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-yellow-50 to-slate-100">
-      <div className="max-w-screen-xl mx-auto px-8 py-10">
+    <main className={`inventory-dashboard inventory-theme-${theme}`}>
+      <div className="inventory-dashboard-inner">
+        <header className="inventory-welcome">
+          <div><span className="inventory-eyebrow"><AppIcon name="shield" size={14} /> Management overview</span><h1>{greeting}, {firstName}!</h1><p>Here is what is happening with Smart Inventory today.</p></div>
+          <div className="inventory-header-actions">
+            <button type="button" className="inventory-header-button" onClick={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><AppIcon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</button>
+            <span className="inventory-date"><AppIcon name="clock" size={15} />{dateLabel}</span>
+            <button type="button" className="inventory-primary-action" onClick={() => navigate('/allitems')}><AppIcon name="boxes" size={16} /> View Inventory</button>
+          </div>
+        </header>
 
-        {/* Header — mirrors: h1 + p in dashboard.php */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent mb-2">
-            Inventory Overview
-          </h1>
-          <p className="text-slate-500 text-sm">Monitor your inventory performance and key metrics</p>
-        </div>
+        {loading ? <DashboardSkeleton /> : <section className="inventory-kpis" aria-label="Inventory summary">{metrics.map((metric) => <MetricCard key={metric.label} {...metric} onClick={metric.action ?? (() => navigate(metric.route))} />)}</section>}
 
-        {/* Stats Grid — mirrors: the 4-card grid in dashboard.php */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <StatCard
-            icon="📦" label="Total Items"
-            value={stats.total_items.toLocaleString()}
-            badge="Active" badgeColor="text-blue-600 bg-blue-50"
-            accentColor="from-blue-500/10 to-transparent"
-            note={<><span className="mr-1">↑</span> All inventory items</>}
-            noteColor="text-green-600"
-          />
-          <StatCard
-            icon="📂" label="Total Categories"
-            value={stats.total_categories.toLocaleString()}
-            badge="Organized" badgeColor="text-emerald-600 bg-emerald-50"
-            accentColor="from-emerald-500/10 to-transparent"
-            note="Categories tracked"
-          />
-          <StatCard
-            icon="⚠️" label="Low Stock Items"
-            value={stats.low_stock_items.toLocaleString()}
-            badge="Alert" badgeColor="text-amber-600 bg-amber-50"
-            accentColor="from-amber-500/10 to-transparent"
-            note={<><span className="mr-1">!</span> {stats.low_stock_items === 0 ? 'All items well stocked' : `${stats.low_stock_items} item${stats.low_stock_items !== 1 ? 's' : ''} need restocking`}</>}
-            noteColor="text-amber-600"
-            popup={data.low_stock_items_list ?? []}
-          />
-          <StatCard
-            icon="💰" label="Inventory Value"
-            value={`₱${stats.total_value.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`}
-            badge="Total" badgeColor="text-violet-600 bg-violet-50"
-            accentColor="from-violet-500/10 to-transparent"
-            note="Current total worth"
-          />
-        </div>
-
-        {/* Charts — mirrors: the two Chart.js canvas elements */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
-          {/* Bar chart */}
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Items per Category</h2>
-                <p className="text-xs text-slate-500 mt-1">Distribution across categories</p>
-              </div>
-              <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                <span className="text-blue-600">📊</span>
-              </div>
+        {!loading && <div className="inventory-dashboard-grid">
+          <section className="inventory-card inventory-overview-card">
+            <div className="inventory-card-head"><div><h2>Inventory Overview</h2><p>Item distribution by category</p></div></div>
+            <div className="inventory-overview-body">
+              <div className="inventory-donut-wrap"><canvas ref={categoryChartRef} aria-label="Items by category chart" /><div><strong>{numberFormat.format(stats.total_items ?? 0)}</strong><span>Total items</span></div></div>
+              <div className="inventory-legend">{legendRows.length === 0 ? <p className="inventory-empty">No categories yet.</p> : legendRows.map((row) => <button type="button" key={row.label} onClick={() => navigate('/allitems')}><i style={{ backgroundColor: row.color }} /><span title={row.label}>{row.label}</span><strong>{numberFormat.format(row.value)}</strong></button>)}</div>
             </div>
-            {/* mirrors: <canvas id="itemsByCategoryChart" height="120"> */}
-            <canvas ref={barChartRef} height={120} />
-          </div>
+          </section>
 
-          {/* Doughnut chart */}
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 hover:shadow-lg transition-shadow duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Stock Distribution</h2>
-                <p className="text-xs text-slate-500 mt-1">Quantity breakdown by category</p>
-              </div>
-              <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center">
-                <span className="text-emerald-600">📈</span>
-              </div>
-            </div>
-            {/* mirrors: <canvas id="stockDistributionChart" height="120"> */}
-            <canvas ref={pieChartRef} height={120} />
-          </div>
-        </div>
+          <section className="inventory-card inventory-recent-card">
+            <div className="inventory-card-head"><div><h2>Recently Added Items</h2><p>Latest additions to inventory</p></div><button type="button" onClick={() => navigate('/allitems')}>View all <AppIcon name="arrowRight" size={13} /></button></div>
+            <div className="inventory-recent-list">{recentItems.length === 0 ? <p className="inventory-empty">No recent items available.</p> : recentItems.map((item, index) => <button type="button" key={`${item.name}-${index}`} onClick={() => navigate('/allitems')}><span className="inventory-recent-icon"><AppIcon name="package" size={15} /></span><span className="inventory-recent-copy"><strong>{item.name}</strong><small>{item.category || 'Uncategorized'}</small></span><span className="inventory-recent-meta"><b className={Number(item.quantity) < 10 ? 'low' : 'good'}>{numberFormat.format(item.quantity)} in stock</b><small>{pesoFormat.format(Number(item.unit_price) || 0)}</small></span></button>)}</div>
+          </section>
 
-        {/* Recent Items Table — mirrors: the recent items PHP foreach table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-lg transition-shadow duration-300">
-          <div className="px-8 py-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-transparent">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-slate-800">Recently Added Items</h2>
-                <p className="text-xs text-slate-500 mt-1">Latest additions to your inventory</p>
-              </div>
-              {/* mirrors: <a href="./items.php"> */}
-              <button onClick={() => navigate('/items')}
-                className="group flex items-center space-x-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                <span>View All</span>
-                <span className="group-hover:translate-x-1 transition-transform">→</span>
-              </button>
-            </div>
-          </div>
+          <section className="inventory-card inventory-quick-card">
+            <div className="inventory-card-head"><div><h2>Quick Actions</h2><p>Common inventory tasks</p></div></div>
+            <div className="inventory-quick-grid"><button type="button" onClick={() => navigate('/items')}><AppIcon name="plus" size={16} />Add Item</button><button type="button" onClick={() => navigate('/allitems')}><AppIcon name="search" size={16} />Browse Items</button><button type="button" onClick={() => navigate('/allocation')}><AppIcon name="layers" size={16} />Allocate Stock</button><button type="button" onClick={() => navigate('/distributions')}><AppIcon name="truck" size={16} />Distributions</button></div>
+            <div className="inventory-health-strip"><span><AppIcon name="check" size={17} /></span><div><strong>System Operational</strong><small>Inventory services are available</small></div></div>
+          </section>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead>
-                <tr className="bg-slate-50/50">
-                  {['Item Name','Category','Quantity','Unit Price'].map(h => (
-                    <th key={h} className="py-4 px-8 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {recent_items.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="py-12 text-center">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                          <span className="text-2xl">📦</span>
-                        </div>
-                        <p className="text-slate-500 font-medium">No recent items found</p>
-                        <p className="text-slate-400 text-sm mt-1">Add your first item to get started</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : recent_items.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-blue-50/30 transition-colors duration-150">
-                    <td className="py-4 px-8">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center mr-3">
-                          <span className="text-xs">📦</span>
-                        </div>
-                        <span className="font-medium text-slate-800">{item.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-8">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
-                        {item.category ?? 'Uncategorized'}
-                      </span>
-                    </td>
-                    <td className="py-4 px-8">
-                      <span className="text-slate-700 font-medium">{item.quantity}</span>
-                    </td>
-                    <td className="py-4 px-8">
-                      {/* mirrors: ₱<?= number_format($item['unit_price'], 2) ?> */}
-                      <span className="text-slate-700 font-semibold">
-                        ₱{parseFloat(item.unit_price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <section className="inventory-card inventory-stock-chart-card">
+            <div className="inventory-card-head"><div><h2>Stock by Category</h2><p>Total units currently available</p></div><span className="inventory-live"><i /> Live data</span></div>
+            <div className="inventory-stock-chart"><canvas ref={stockChartRef} aria-label="Stock by category chart" /></div>
+          </section>
 
+          <section className="inventory-card inventory-status-card">
+            <div className="inventory-card-head"><div><h2>Stock Health</h2><p>Current inventory condition</p></div></div>
+            <button type="button" className="inventory-outcome healthy" onClick={() => navigate('/allitems')}><span><AppIcon name="check" size={19} /></span><div><strong>{numberFormat.format(healthyItems)}</strong><small>Well-stocked items</small></div><AppIcon name="arrowRight" size={15} /></button>
+            <button type="button" className="inventory-outcome warning" onClick={() => setShowLowStock(true)}><span><AppIcon name="alert" size={19} /></span><div><strong>{numberFormat.format(stats.low_stock_items ?? 0)}</strong><small>Low-stock items</small></div><AppIcon name="arrowRight" size={15} /></button>
+            <div className="inventory-total-stock"><span>Total units on hand</span><strong>{numberFormat.format(totalStock)}</strong></div>
+          </section>
+        </div>}
       </div>
-    </div>
+
+      {showLowStock && <div className="inventory-modal-backdrop" role="presentation" onMouseDown={() => setShowLowStock(false)}>
+        <section className="inventory-low-stock-modal" role="dialog" aria-modal="true" aria-labelledby="low-stock-title" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="inventory-modal-head"><div><span><AppIcon name="alert" size={19} /></span><div><h2 id="low-stock-title">Low Stock Items</h2><p>Items with fewer than 10 units remaining</p></div></div><button type="button" onClick={() => setShowLowStock(false)} aria-label="Close low stock items"><AppIcon name="x" size={18} /></button></div>
+          <div className="inventory-low-stock-list">{lowStockItems.length === 0 ? <div className="inventory-all-good"><span><AppIcon name="check" size={22} /></span><strong>All items are well stocked</strong><p>Nothing needs your attention right now.</p></div> : lowStockItems.map((item, index) => <div key={`${item.name}-${index}`}><span className="inventory-recent-icon"><AppIcon name="package" size={15} /></span><div><strong>{item.name}</strong><small>{item.category || 'Uncategorized'}</small></div><b className={Number(item.quantity) === 0 ? 'empty' : ''}>{Number(item.quantity) === 0 ? 'Out of stock' : `${numberFormat.format(item.quantity)} left`}</b></div>)}</div>
+          <div className="inventory-modal-footer"><span>{lowStockItems.length} item{lowStockItems.length === 1 ? '' : 's'} need attention</span><button type="button" onClick={() => navigate('/items')}>Manage Items</button></div>
+        </section>
+      </div>}
+    </main>
   );
 }

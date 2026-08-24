@@ -1,109 +1,48 @@
-// frontend/src/pages/Login.jsx
-// Converted from: index.php (the HTML form + PHP POST handler)
-//
-// PHP form:  <form method="POST"> → $_POST['username'], $_POST['password']
-// React:     controlled inputs    → login() from AuthContext → navigate('/dashboard')
-
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import AppIcon from '../components/AppIcon.jsx';
 
 export default function Login() {
   const { login, user } = useAuth();
-  const navigate        = useNavigate();
-
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');   // mirrors $error in PHP
-  const [loading, setLoading]   = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // Already logged in → go straight to dashboard
-  // Mirrors: the session check redirect at the top of index.php
   if (user) return <Navigate to="/dashboard" replace />;
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
     setError('');
-
-    // Mirrors: if ($username === "" || $password === "")
-    if (!username.trim() || !password.trim()) {
-      setError('All fields are required.');
-      return;
-    }
-
+    if (!username.trim() || !password.trim()) { setError('All fields are required.'); return; }
     setLoading(true);
-    try {
-      const loggedIn = await login(username, password);
-      // Mirrors: header("Location: pages/dashboard.php")
-      navigate('/dashboard');
-    } catch (err) {
-      // Mirrors: $error = "Invalid username or password."
-      setError(err.response?.data?.message || 'Invalid username or password.');
-    } finally {
-      setLoading(false);
-    }
+    try { await login(username, password); navigate('/dashboard'); }
+    catch (err) { setError(err.response?.data?.message || 'Invalid username or password.'); }
+    finally { setLoading(false); }
   }
 
   return (
-    <section className="bg-gray-100">
-      <div className="flex items-center justify-center min-h-screen p-6">
-        <div className="relative flex flex-col m-6 space-y-8 bg-white shadow-2xl rounded-2xl md:space-y-0 max-w-md w-full overflow-hidden border border-slate-200">
-
-          <div className="flex flex-col justify-center p-8 md:p-14 flex-1">
-            <div className="text-center mb-8">
-              <span className="text-3xl font-bold bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent md:text-4xl">
-                Smart Inventory System
-              </span>
-              <span className="mt-4 text-lg text-slate-500 block">
-                Welcome! Please enter your account to proceed.
-              </span>
-            </div>
-
-            {/* Error message — mirrors PHP $error display */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 placeholder-slate-400"
-                  placeholder="Enter your username"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 placeholder-slate-400"
-                  placeholder="Enter your password"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-lg shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                {loading ? 'Logging in...' : 'Login'}
-              </button>
-            </form>
-          </div>
+    <main className="login-page">
+      <section className="login-brand-pane">
+        <div className="login-brand-mark"><img src="/Logo.png" alt="Smart Inventory logo" /><div><strong>Smart Inventory</strong><small>Management System</small></div></div>
+        <div className="login-brand-message"><h1>Every item, clearly accounted for.</h1><p>A focused inventory workspace for monitoring stock, managing allocations, and keeping distributions organized.</p></div>
+        <div className="login-brand-foot"><AppIcon name="shield" size={15} /> Secure inventory operations</div>
+      </section>
+      <section className="login-form-pane">
+        <div className="login-card">
+          <span className="login-card-eyebrow"><AppIcon name="sparkles" size={14} /> Welcome back</span>
+          <h2>Sign in to continue</h2>
+          <p>Enter your account details to open your inventory workspace.</p>
+          {error && <div className="login-error" role="alert"><AppIcon name="alert" size={17} />{error}</div>}
+          <form onSubmit={handleSubmit}>
+            <div className="login-field"><label htmlFor="login-username">Username</label><div className="login-input-wrap"><AppIcon name="user" size={17} /><input id="login-username" type="text" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Enter your username" autoComplete="username" /></div></div>
+            <div className="login-field"><label htmlFor="login-password">Password</label><div className="login-input-wrap"><AppIcon name="shield" size={17} /><input id="login-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" /></div></div>
+            <button type="submit" disabled={loading} className="login-submit">{loading ? <><AppIcon name="refresh" size={17} className="animate-spin" /> Signing in...</> : <>Sign in <AppIcon name="arrowRight" size={17} /></>}</button>
+          </form>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
   );
 }

@@ -271,9 +271,9 @@ export async function exportItemMovement(req, res) {
     const fmtDate = (str) => str ? new Date(str).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'N/A';
     const fmtDateTime = (str) => str ? new Date(str).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
     const period = start_date || end_date
-      ? `${start_date ? fmtDate(start_date) : 'Beginning'} — ${end_date ? fmtDate(end_date) : 'Present'}`
+      ? `${start_date ? fmtDate(start_date) : 'Beginning'} - ${end_date ? fmtDate(end_date) : 'Present'}`
       : 'All Time';
-    const subtitle = `Item Movement Report  •  ${period}  •  ${movements.length} records`;
+    const subtitle = `Item Movement Report | ${period} | ${movements.length} records`;
 
     // ── PDF ────────────────────────────────────────────────
     if (format === 'pdf') {
@@ -309,36 +309,70 @@ export async function exportItemMovement(req, res) {
         { label: 'Performed By', width: 100 },
       ];
 
-      let y = 138, x;
-      x = 40;
-      cols.forEach(col => {
-        doc.rect(x, y, col.width, 18).fill('#2563EB');
-        doc.fontSize(8).font('Helvetica-Bold').fillColor('#FFFFFF').text(col.label, x + 4, y + 5, { width: col.width - 8, align: 'center' });
-        x += col.width;
-      });
-      y += 18;
+      const availableWidth = pageW - 80;
+      const widthScale = availableWidth / cols.reduce((sum, col) => sum + col.width, 0);
+      cols.forEach(col => { col.width *= widthScale; });
+
+      const cleanPdfText = (value) => String(value ?? '')
+        .replace(/[•·]/g, ' | ')
+        .replace(/[–—]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const drawMovementHeader = (headerY) => {
+        let headerX = 40;
+        cols.forEach(col => {
+          doc.rect(headerX, headerY, col.width, 20).fill('#2563EB');
+          doc.fontSize(8).font('Helvetica-Bold').fillColor('#FFFFFF')
+             .text(col.label, headerX + 4, headerY + 6, { width: col.width - 8, align: 'center', lineBreak: false });
+          headerX += col.width;
+        });
+        return headerY + 20;
+      };
+
+      const startContinuationPage = () => {
+        doc.addPage();
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#1E3A5F')
+           .text('ITEM MOVEMENT REPORT (CONTINUED)', 40, 36, { align: 'center', width: pageW - 80 });
+        return drawMovementHeader(54);
+      };
+
+      let y = drawMovementHeader(138);
 
       movements.forEach((m, i) => {
-        if (y + 14 > doc.page.height - 40) { doc.addPage(); y = 50; }
+        const vals = [fmtDateTime(m.txn_date), m.item_name, m.type, m.source, String(m.quantity), m.performed_by || 'system'].map(cleanPdfText);
+        doc.fontSize(7.5).font('Helvetica');
+        const rowHeight = Math.min(30, Math.max(
+          17,
+          doc.heightOfString(vals[1], { width: cols[1].width - 8 }) + 7,
+          doc.heightOfString(vals[5], { width: cols[5].width - 8 }) + 7,
+        ));
+        if (y + rowHeight > doc.page.height - 76) y = startContinuationPage();
         const bg = i % 2 === 1 ? '#EFF6FF' : '#FFFFFF';
         const typeColor = m.type === 'IN' ? '#059669' : m.type === 'OUT' ? '#DC2626' : '#2563EB';
-        x = 40;
-        const vals = [fmtDateTime(m.txn_date), m.item_name, m.type, m.source, String(m.quantity), m.performed_by || 'system'];
+        let x = 40;
         cols.forEach((col, ci) => {
-          doc.rect(x, y, col.width, 14).fill(bg);
-          doc.moveTo(x, y + 14).lineTo(x + col.width, y + 14).lineWidth(0.3).strokeColor('#CBD5E1').stroke();
+          doc.rect(x, y, col.width, rowHeight).fill(bg);
+          doc.moveTo(x, y + rowHeight).lineTo(x + col.width, y + rowHeight).lineWidth(0.3).strokeColor('#CBD5E1').stroke();
           const color = ci === 2 ? typeColor : '#1E293B';
-          doc.fontSize(7.5).font('Helvetica').fillColor(color).text(vals[ci] || '—', x + 3, y + 3, { width: col.width - 6, align: 'center', lineBreak: false });
+          const wraps = ci === 1 || ci === 5;
+          doc.fontSize(7.5).font('Helvetica').fillColor(color).text(vals[ci] || '-', x + 3, y + 4, {
+            width: col.width - 6,
+            height: rowHeight - 7,
+            align: wraps ? 'left' : 'center',
+            lineBreak: wraps,
+            ellipsis: true,
+          });
           x += col.width;
         });
-        y += 14;
+        y += rowHeight;
       });
 
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
-        doc.fontSize(7).fillColor('#64748B').text('CCWD Inventory Management System', 40, doc.page.height - 28, { align: 'left', width: (pageW - 80) / 2 });
-        doc.fontSize(7).fillColor('#64748B').text(`Page ${i + 1} of ${pages.count}`, 40, doc.page.height - 28, { align: 'right', width: pageW - 80 });
+        doc.fontSize(7).fillColor('#64748B').text('CCWD Inventory Management System', 40, doc.page.height - 62, { align: 'left', width: (pageW - 80) / 2, lineBreak: false });
+        doc.fontSize(7).fillColor('#64748B').text(`Page ${i + 1} of ${pages.count}`, 40, doc.page.height - 62, { align: 'right', width: pageW - 80, lineBreak: false });
       }
       doc.end();
       return;
@@ -385,15 +419,24 @@ export async function exportItemMovement(req, res) {
 
     movements.forEach((m, i) => {
       const r = sheet.addRow([fmtDateTime(m.txn_date), m.item_name, m.type, m.source, m.quantity, m.performed_by || 'system']);
-      r.height = 17;
+      r.height = 22;
       const typeColor = m.type === 'IN' ? 'FF059669' : m.type === 'OUT' ? 'FFDC2626' : 'FF2563EB';
       r.eachCell((cell, col) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 1 ? 'FFEFF6FF' : 'FFFFFFFF' } };
         cell.font = { size: 9, color: { argb: col === 3 ? typeColor : 'FF1E293B' } };
-        cell.alignment = { vertical: 'middle' };
+        cell.alignment = { vertical: 'middle', wrapText: col === 2 || col === 6 };
         cell.border = { bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } } };
       });
     });
+
+    sheet.views = [{ state: 'frozen', ySplit: hRow.number, showGridLines: false }];
+    sheet.autoFilter = { from: { row: hRow.number, column: 1 }, to: { row: Math.max(hRow.number, sheet.rowCount), column: 6 } };
+    sheet.pageSetup = {
+      orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      printTitlesRow: `${hRow.number}:${hRow.number}`,
+      margins: { left: 0.3, right: 0.3, top: 0.55, bottom: 0.55, header: 0.2, footer: 0.2 },
+    };
+    sheet.headerFooter.oddFooter = '&LCCWD Inventory Management System&CConfidential&RPage &P of &N';
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="item_movement_${Date.now()}.xlsx"`);

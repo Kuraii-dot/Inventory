@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Modal from '../Modal.jsx';
 import client from '../../api/client.js';
 import { fetchClassifications, createClassification } from '../../api/items.js';
+import AppIcon from '../AppIcon.jsx';
 
 export default function ClassificationModal({ open, onClose, categories, showToast }) {
   const [selectedCategory,  setSelectedCategory]  = useState('');
@@ -136,11 +137,11 @@ export default function ClassificationModal({ open, onClose, categories, showToa
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => { setEditId(cls.id); setEditName(cls.classification_name); }}
                       className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
-                      ✏️ Edit
+                      <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                     </button>
                     <button onClick={() => handleDelete(cls.id)}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium">
-                      🗑️ Delete
+                      <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                     </button>
                   </div>
                 </>

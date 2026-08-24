@@ -12,6 +12,7 @@
 
 import { useState } from 'react';
 import Modal from './Modal.jsx';
+import AppIcon from './AppIcon.jsx';
 import {
   downloadDistributionsReport,
   downloadOverallReport,
@@ -107,12 +108,12 @@ export default function ReportModal({
         <div className={`p-5 bg-gradient-to-r ${clr.bg} rounded-xl border ${clr.border}`}>
           <label className="block text-sm font-semibold text-slate-700 mb-3">Select Format</label>
           <div className="flex gap-6">
-            {[['pdf','📄 PDF'], ['excel','📊 Excel']].map(([val, label]) => (
+            {[['pdf','PDF','file'], ['excel','Excel','report']].map(([val, label, icon]) => (
               <label key={val} className="flex items-center gap-2 cursor-pointer">
                 <input type="radio" name="format" value={val}
                   checked={form.format === val} onChange={handleChange}
                   className="w-4 h-4 accent-slate-700" />
-                <span className="text-slate-700 font-medium">{label}</span>
+                <span className="text-slate-700 font-medium flex items-center gap-2"><AppIcon name={icon} size={15} />{label}</span>
               </label>
             ))}
           </div>
@@ -215,15 +216,9 @@ export default function ReportModal({
           <button type="submit" disabled={loading}
             className={`px-8 py-2.5 bg-gradient-to-r ${clr.btn} text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-60 flex items-center gap-2`}>
             {loading ? (
-              <>
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-                <span>Generating...</span>
-              </>
+              <><AppIcon name="refresh" className="animate-spin" /><span>Generating...</span></>
             ) : (
-              <><span>{form.format === 'excel' ? '📊' : '📄'}</span><span>Generate Report</span></>
+              <><AppIcon name={form.format === 'excel' ? 'report' : 'file'} /><span>Generate Report</span></>
             )}
           </button>
         </div>

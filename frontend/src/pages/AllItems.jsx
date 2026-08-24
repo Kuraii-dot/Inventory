@@ -8,6 +8,7 @@ import { useToast, ToastContainer } from '../hooks/useToast.jsx';
 import Modal       from '../components/Modal.jsx';
 import client      from '../api/client.js';
 import ReportModal from '../components/ReportModal.jsx';
+import AppIcon    from '../components/AppIcon.jsx';
 
 // ── Helpers ───────────────────────────────────────────────────
 function usageRate(stock, distributed) {
@@ -230,29 +231,29 @@ export default function AllItems() {
   const selectCls = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent transition";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-slate-200">
-      <div className="max-w-screen-xl mx-auto px-8 py-10">
+    <div className="app-page min-h-screen bg-gradient-to-br from-amber-50 via-sky-50 to-slate-200">
+      <div className="app-page-inner max-w-screen-xl mx-auto px-8 py-10">
 
         {/* ── Header ─────────────────────────────────────── */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="app-page-header flex justify-between items-start mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-sky-600 bg-clip-text text-transparent mb-2">
               All Items Overview
             </h1>
             <p className="text-slate-500 text-sm">Complete lifetime inventory summary with all-time distribution tracking</p>
           </div>
-          <div className="flex gap-3">
+          <div className="app-page-actions flex gap-3">
             <button onClick={() => setShowDepartment(true)}
               className="px-5 py-2.5 bg-amber-50 text-sky-600 font-medium rounded-xl border-2 border-amber-300 hover:border-sky-400 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>🏢</span><span>Department Reports</span>
+              <AppIcon name="users" /><span>Department Reports</span>
             </button>
             <button onClick={() => setShowReport(true)}
               className="px-5 py-2.5 bg-amber-50 text-sky-600 font-medium rounded-xl border-2 border-amber-300 hover:border-sky-400 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>📊</span><span>Item Reports</span>
+              <AppIcon name="report" /><span>Item Reports</span>
             </button>
             <button onClick={() => setShowLedger(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-amber-400 to-sky-500 text-white border-2 border-amber-400 font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>📂</span><span>Item Ledger</span>
+              className="app-primary-button px-6 py-2.5 bg-gradient-to-r from-amber-400 to-sky-500 text-white border-2 border-amber-400 font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+              <AppIcon name="ledger" /><span>Item Ledger</span>
             </button>
           </div>
         </div>
@@ -261,7 +262,7 @@ export default function AllItems() {
         <div className="bg-gradient-to-r from-amber-50 to-sky-50 border border-amber-200 rounded-xl p-5 mb-6">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-xl">ℹ️</span>
+              <AppIcon name="info" size={20} className="text-blue-600" />
             </div>
             <div>
               <h3 className="font-semibold text-slate-800 mb-1">Combined View</h3>
@@ -273,13 +274,13 @@ export default function AllItems() {
         </div>
 
         {/* ── Search Bar ─────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-amber-50 to-sky-50 rounded-2xl shadow-sm border border-amber-200 p-6 mb-6">
+        <div className="app-page-panel bg-gradient-to-r from-amber-50 to-sky-50 rounded-2xl shadow-sm border border-amber-200 p-6 mb-6">
           <div className="flex items-center gap-4">
             <div className="flex-1 relative">
               <input type="text" value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search by item name or category..."
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-400 focus:border-transparent transition" />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
             <div className="flex items-center gap-2 text-sm text-slate-600">
               <span className="font-medium">Showing:</span>
@@ -294,7 +295,7 @@ export default function AllItems() {
         </div>
 
         {/* ── Items Table ─────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-amber-50 to-sky-50 rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
+        <div className="app-page-panel bg-gradient-to-r from-amber-50 to-sky-50 rounded-2xl shadow-sm border border-amber-100 overflow-hidden">
           <table style={{ minWidth: "1200px" }} className="w-full">
             <thead>
               <tr className="bg-gradient-to-r from-amber-300 to-sky-600 text-white">
@@ -312,7 +313,7 @@ export default function AllItems() {
                 <tr>
                   <td colSpan="6" className="py-16 text-center">
                     <div className="flex flex-col items-center">
-                      <span className="text-3xl mb-4">📦</span>
+                      <AppIcon name="packageOpen" size={34} className="mb-4 text-slate-300" />
                       <p className="text-slate-500 font-medium">No items found</p>
                     </div>
                   </td>
@@ -334,7 +335,7 @@ export default function AllItems() {
                         </span>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sky-700">📦 {catName}</span>
+                            <span className="text-sky-700 flex items-center gap-1"><AppIcon name="package" size={14} /> {catName}</span>
                             <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-medium">
                               {catItems.length} item{catItems.length !== 1 ? 's' : ''}
                             </span>
@@ -369,7 +370,7 @@ export default function AllItems() {
                         <td className="py-3 px-6">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 bg-gradient-to-br from-amber-100 to-sky-200 rounded-lg flex items-center justify-center">
-                              <span className="text-sm">📦</span>
+                              <AppIcon name="package" size={15} />
                             </div>
                             <div>
                               <p className="font-semibold text-sky-900 text-sm">{row.item_name}</p>
@@ -415,14 +416,14 @@ export default function AllItems() {
         {/* ── Stats Cards ─────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
           {[
-            { bg: 'bg-emerald-100', icon: '📊', label: 'Low Usage',         val: stats.low,      cls: 'text-emerald-600' },
-            { bg: 'bg-amber-100',   icon: '📈', label: 'Moderate Usage',    val: stats.moderate, cls: 'text-amber-600'   },
-            { bg: 'bg-red-100',     icon: '🔥', label: 'High Usage',        val: stats.high,     cls: 'text-red-600'     },
+            { bg: 'bg-emerald-100', icon: 'barChart', label: 'Low Usage',         val: stats.low,      cls: 'text-emerald-600' },
+            { bg: 'bg-amber-100',   icon: 'arrowUp', label: 'Moderate Usage',    val: stats.moderate, cls: 'text-amber-600'   },
+            { bg: 'bg-red-100',     icon: 'alert', label: 'High Usage',        val: stats.high,     cls: 'text-red-600'     },
           ].map(s => (
             <div key={s.label} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
               <div className="flex items-center gap-4">
                 <div className={`w-12 h-12 ${s.bg} rounded-lg flex items-center justify-center`}>
-                  <span className="text-2xl">{s.icon}</span>
+                  <AppIcon name={s.icon} size={22} />
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">{s.label}</p>
@@ -436,7 +437,7 @@ export default function AllItems() {
           <div className="relative bg-white rounded-xl shadow-sm border border-slate-100 p-6 group">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🔀</span>
+                <AppIcon name="layers" size={22} />
               </div>
               <div>
                 <p className="text-sm text-slate-500">Multiple Variants</p>
@@ -479,25 +480,25 @@ export default function AllItems() {
 
       {/* ── Ledger Modal ───────────────────────────────────── */}
       <Modal open={showLedger} onClose={() => { setShowLedger(false); setLedgerData(null); setInvPreview(null); }}
-        title="📂 Item Ledger" subtitle="View transaction history and movement preview" maxWidth="max-w-5xl">
+        title="Item Ledger" subtitle="View transaction history and movement preview" maxWidth="max-w-5xl">
 
         {/* ── Tabs ── */}
         <div className="flex gap-2 mb-6">
           {[
-            { id: 'ledger',  label: '📋 Item Ledger'   },
-            { id: 'preview', label: '👁️ Movement Preview' },
+            { id: 'ledger',  label: 'Item Ledger', icon: 'ledger' },
+            { id: 'preview', label: 'Movement Preview', icon: 'eye' },
           ].map(t => (
             <button key={t.id}
               onClick={() => { setLedgerData(null); setInvPreview(null); }}
               className="px-5 py-2 rounded-xl font-medium text-sm border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
-              {t.label}
+              <span className="flex items-center gap-2"><AppIcon name={t.icon} size={14} />{t.label}</span>
             </button>
           ))}
         </div>
 
         {/* ── Inventory Preview & Report ── */}
         <div className="bg-gradient-to-r from-emerald-50 to-sky-50 rounded-xl p-5 border border-emerald-200 mb-4">
-          <h3 className="font-semibold text-slate-700 mb-3">📋 Inventory Preview & Report</h3>
+          <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><AppIcon name="clipboard" /> Inventory Preview & Report</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Filter Type</label>
@@ -556,15 +557,15 @@ export default function AllItems() {
           <div className="flex flex-wrap gap-2 mt-1">
             <button onClick={loadInvPreview} disabled={invPreviewLoading}
               className="px-5 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium rounded-lg hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2 text-sm">
-              {invPreviewLoading ? '⏳ Loading...' : '👁️ Preview'}
+              <AppIcon name={invPreviewLoading ? 'refresh' : 'eye'} className={invPreviewLoading ? 'animate-spin' : ''} />{invPreviewLoading ? 'Loading...' : 'Preview'}
             </button>
             <button onClick={() => handleInvExport('pdf')} disabled={invExporting}
               className="px-5 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50">
-              📄 Export PDF
+              <AppIcon name="file" /> Export PDF
             </button>
             <button onClick={() => handleInvExport('excel')} disabled={invExporting}
               className="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm disabled:opacity-50">
-              📊 Export Excel
+              <AppIcon name="report" /> Export Excel
             </button>
           </div>
 
@@ -614,7 +615,7 @@ export default function AllItems() {
 
         {/* ── Item Ledger Section ── */}
         <div className="bg-white rounded-xl p-5 border border-sky-200">
-          <h3 className="font-semibold text-slate-700 mb-3">📋 Item Ledger</h3>
+          <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><AppIcon name="ledger" /> Item Ledger</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
@@ -660,7 +661,7 @@ export default function AllItems() {
                 }
               }}
               className="px-6 py-2.5 bg-gradient-to-r from-amber-400 to-sky-500 text-white font-medium rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-              {ledgerLoading ? <><span>⏳</span><span>Loading...</span></> : <><span>🔍</span><span>Find Transactions</span></>}
+              {ledgerLoading ? <><AppIcon name="refresh" className="animate-spin" /><span>Loading...</span></> : <><AppIcon name="search" /><span>Find Transactions</span></>}
             </button>
           </div>
         </div>
@@ -674,7 +675,7 @@ export default function AllItems() {
             {/* Item info card */}
             <div className="bg-white rounded-xl p-6 mb-4 border border-sky-200 flex items-center gap-4">
               <div className="w-14 h-14 bg-gradient-to-br from-amber-100 to-sky-200 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">📦</span>
+                <AppIcon name="package" size={24} />
               </div>
               <div>
                 <h3 className="text-xl font-bold text-slate-800">{ledgerData.item_info.name}</h3>
@@ -711,7 +712,7 @@ export default function AllItems() {
                   document.body.removeChild(a); URL.revokeObjectURL(url);
                 }}
                 className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 text-sm">
-                <span>📄</span><span>Export PDF</span>
+                <AppIcon name="file" /><span>Export PDF</span>
               </button>
               <button
                 onClick={async () => {
@@ -723,7 +724,7 @@ export default function AllItems() {
                   document.body.removeChild(a); URL.revokeObjectURL(url);
                 }}
                 className="px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm">
-                <span>📊</span><span>Export Excel</span>
+                <AppIcon name="report" /><span>Export Excel</span>
               </button>
             </div>
 

@@ -38,6 +38,31 @@ function hexToRgb(hex) {
   return [r, g, b];
 }
 
+function pdfText(value) {
+  return String(value ?? '')
+    .replace(/₱/g, 'PHP ')
+    .replace(/[•·]/g, ' - ')
+    .replace(/[–—]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function fitPdfColumns(doc, columns) {
+  if (columns.__fittedToPage) return columns;
+  const available = doc.page.width - 80;
+  const declared = columns.reduce((sum, column) => sum + column.width, 0) || available;
+  const scale = available / declared;
+  let used = 0;
+  columns.forEach((column, index) => {
+    column.width = index === columns.length - 1
+      ? available - used
+      : Math.max(28, Math.round(column.width * scale));
+    used += column.width;
+  });
+  Object.defineProperty(columns, '__fittedToPage', { value: true });
+  return columns;
+}
+
 function drawPageFrame(doc) {
   // Subtle border around the page
   doc.save()
@@ -70,11 +95,11 @@ function drawReportHeader(doc, title, subtitle, accentColor = COLORS.accent) {
 
   // Title
   doc.fontSize(22).font('Helvetica-Bold').fillColor(COLORS.primary)
-     .text(title, 40, 62, { align: 'center', width: pageW - 80 });
+     .text(pdfText(title), 40, 62, { align: 'center', width: pageW - 80 });
 
   // Subtitle
   doc.fontSize(10).font('Helvetica').fillColor(COLORS.muted)
-     .text(subtitle, 40, 90, { align: 'center', width: pageW - 80 });
+     .text(pdfText(subtitle), 40, 90, { align: 'center', width: pageW - 80 });
 
   // Second divider
   doc.moveTo(40, 108).lineTo(pageW - 40, 108)
@@ -85,30 +110,36 @@ function drawReportHeader(doc, title, subtitle, accentColor = COLORS.accent) {
 }
 
 function drawTableHeader(doc, columns, y, accentColor = COLORS.accent) {
-  const [r, g, b] = hexToRgb(accentColor);
+  fitPdfColumns(doc, columns);
   let x = 40;
-  const rowH = 20;
+  const rowH = 24;
 
   columns.forEach(col => {
     // Header background
     doc.rect(x, y, col.width, rowH).fill(accentColor);
     // Header text
     doc.fontSize(8).font('Helvetica-Bold').fillColor(COLORS.white)
-       .text(col.label, x + 4, y + 6, { width: col.width - 8, align: col.align || 'left' });
+       .text(pdfText(col.label), x + 4, y + 7, { width: col.width - 8, align: col.align || 'left', lineBreak: false });
     x += col.width;
   });
   return y + rowH;
 }
 
-function drawTableRow(doc, columns, values, y, isAlt = false, pageH = 792) {
-  // Auto page break
-  if (y + 18 > pageH - 60) {
+function drawTableRow(doc, columns, values, y, isAlt = false, pageH = 792, accentColor = COLORS.accent) {
+  fitPdfColumns(doc, columns);
+  const texts = values.map(value => pdfText(value ?? '-'));
+  const textHeights = columns.map((col, i) => doc.fontSize(7.5).font('Helvetica').heightOfString(texts[i], {
+    width: col.width - 8,
+    align: col.align || 'left',
+  }));
+  const rowH = Math.max(18, Math.min(38, Math.ceil(Math.max(...textHeights, 10) + 8)));
+
+  if (y + rowH > pageH - 78) {
     doc.addPage();
     drawPageFrame(doc);
-    y = 50;
+    y = drawTableHeader(doc, columns, 42, accentColor);
   }
 
-  const rowH = 16;
   let x = 40;
   const bgColor = isAlt ? COLORS.rowAlt : COLORS.white;
 
@@ -119,31 +150,31 @@ function drawTableRow(doc, columns, values, y, isAlt = false, pageH = 792) {
     doc.moveTo(x, y + rowH).lineTo(x + col.width, y + rowH)
        .lineWidth(0.3).strokeColor(COLORS.border).stroke();
     // Cell text
-    const val = values[i] ?? '—';
-    doc.fontSize(8).font('Helvetica').fillColor(COLORS.text)
-       .text(String(val), x + 4, y + 4, { width: col.width - 8, align: col.align || 'left', lineBreak: false });
+    doc.fontSize(7.5).font('Helvetica').fillColor(COLORS.text)
+       .text(texts[i], x + 4, y + 4, { width: col.width - 8, height: rowH - 7, align: col.align || 'left', ellipsis: true });
     x += col.width;
   });
   return y + rowH;
 }
 
 function drawTotalRow(doc, columns, label, value, y, accentColor = COLORS.accent) {
-  if (y + 22 > doc.page.height - 60) { doc.addPage(); drawPageFrame(doc); y = 50; }
+  fitPdfColumns(doc, columns);
+  if (y + 22 > doc.page.height - 78) { doc.addPage(); drawPageFrame(doc); y = 50; }
   const totalW = columns.reduce((s, c) => s + c.width, 0);
   const lastCol = columns[columns.length - 1];
   const labelW  = totalW - lastCol.width;
 
   doc.rect(40, y, totalW, 20).fill(accentColor);
   doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.white)
-     .text(label, 44, y + 5, { width: labelW - 8, align: 'right' });
+     .text(pdfText(label), 44, y + 5, { width: labelW - 8, align: 'right' });
   doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.white)
-     .text(value, 40 + labelW + 4, y + 5, { width: lastCol.width - 8, align: 'right' });
+     .text(pdfText(value), 40 + labelW + 4, y + 5, { width: lastCol.width - 8, align: 'right' });
   return y + 22;
 }
 
 function drawSignatories(doc, signatories, y) {
   if (!signatories.some(s => s.value)) return;
-  if (y + 60 > doc.page.height - 40) { doc.addPage(); drawPageFrame(doc); y = 50; }
+  if (y + 60 > doc.page.height - 78) { doc.addPage(); drawPageFrame(doc); y = 50; }
 
   doc.moveTo(40, y + 10).lineTo(doc.page.width - 40, y + 10)
      .lineWidth(0.5).strokeColor(COLORS.border).stroke();
@@ -152,22 +183,22 @@ function drawSignatories(doc, signatories, y) {
   signatories.forEach((s, i) => {
     const sx = 40 + i * perW;
     doc.fontSize(7).font('Helvetica').fillColor(COLORS.muted)
-       .text(s.label.toUpperCase(), sx, y + 16, { width: perW - 10, align: 'center' });
+       .text(pdfText(s.label).toUpperCase(), sx, y + 16, { width: perW - 10, align: 'center' });
     doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.text)
-       .text(s.value || '—', sx, y + 28, { width: perW - 10, align: 'center' });
+       .text(pdfText(s.value || '-'), sx, y + 28, { width: perW - 10, align: 'center' });
     doc.moveTo(sx + 10, y + 40).lineTo(sx + perW - 20, y + 40)
        .lineWidth(0.5).strokeColor(COLORS.border).stroke();
   });
 }
 
-function drawFooter(doc) {
-  const y = doc.page.height - 40;
+function drawFooter(doc, pageNumber, totalPages) {
+  const y = doc.page.height - 66;
   const pageW = doc.page.width;
   doc.rect(20, y - 4, pageW - 40, 0.5).fill(COLORS.border);
   doc.fontSize(7).font('Helvetica').fillColor(COLORS.muted)
-     .text('CCWD Inventory Management System  •  Confidential', 40, y + 4, { align: 'left', width: (pageW - 80) / 2 });
+     .text('CCWD Inventory Management System - Confidential', 40, y + 4, { align: 'left', width: (pageW - 80) / 2, lineBreak: false });
   doc.fontSize(7).fillColor(COLORS.muted)
-     .text(`Page ${doc.bufferedPageRange().count}`, 40, y + 4, { align: 'right', width: pageW - 80 });
+     .text(`Page ${pageNumber} of ${totalPages}`, 40, y + 4, { align: 'right', width: pageW - 80, lineBreak: false });
 }
 
 // ─── Excel helpers ────────────────────────────────────────────
@@ -186,11 +217,11 @@ function styleExcelHeader(sheet, row, cols) {
 }
 
 function styleExcelRow(row, isAlt = false) {
-  row.height = 18;
+  row.height = 22;
   row.eachCell(cell => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isAlt ? 'FFEFF6FF' : 'FFFFFFFF' } };
     cell.font = { size: 9, color: { argb: 'FF1E293B' } };
-    cell.alignment = { vertical: 'middle' };
+    cell.alignment = { vertical: 'middle', wrapText: true };
     cell.border = { bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } } };
   });
 }
@@ -249,7 +280,7 @@ function getDateRange(timeframe, from, to) {
   }
 }
 
-function fmtCurrency(n) { return '₱' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }); }
+function fmtCurrency(n) { return 'PHP ' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 }); }
 function fmtDate(str)    { return str ? new Date(str).toLocaleDateString('en-PH', { dateStyle: 'medium' }) : 'N/A'; }
 function fmtDateTime(str){ return str ? new Date(str).toLocaleString('en-PH',  { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A'; }
 
@@ -307,7 +338,7 @@ export async function distributionsReport(req, res) {
           fmtDateTime(r.distributed_at),
           r.item, r.category, r.recipient, r.department,
           r.quantity, fmtCurrency(r.total_value), r.approved_by,
-        ], y, i % 2 === 1);
+        ], y, i % 2 === 1, doc.page.height, COLORS.accent);
       });
 
       y = drawTotalRow(doc, cols, 'TOTAL VALUE', fmtCurrency(totalValue), y + 4);
@@ -317,7 +348,7 @@ export async function distributionsReport(req, res) {
       const pages = doc.bufferedPageRange();
       for (let i = 0; i < pages.count; i++) {
         doc.switchToPage(i);
-        drawFooter(doc);
+        drawFooter(doc, i + 1, pages.count);
       }
 
       doc.end();
@@ -340,7 +371,7 @@ export async function distributionsReport(req, res) {
       { header: 'Total Value',  key: 'val',   width: 16 },
       { header: 'Approved By',  key: 'appr',  width: 20 },
     ];
-    sheet.columns = colDefs;
+    sheet.columns = colDefs.map(({ key, width }) => ({ key, width }));
 
     addExcelTitleBlock(sheet, 'DISTRIBUTIONS REPORT', subtitle, colDefs.length);
     const hRow = sheet.addRow(colDefs.map(c => c.header));
@@ -352,12 +383,13 @@ export async function distributionsReport(req, res) {
         r.recipient, r.department, r.quantity,
         parseFloat(r.total_value || 0), r.approved_by,
       ]);
-      row.getCell(7).numFmt = '₱#,##0.00';
+      row.getCell(7).numFmt = '"PHP" #,##0.00';
       styleExcelRow(row, i % 2 === 1);
     });
 
     addExcelTotalRow(sheet, colDefs.length, 'TOTAL VALUE', totalValue);
-    sheet.getCell(sheet.rowCount, colDefs.length).numFmt = '₱#,##0.00';
+    sheet.getCell(sheet.rowCount, colDefs.length).numFmt = '"PHP" #,##0.00';
+    finalizeExcelSheet(sheet, hRow.number, colDefs.length);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="distributions_report_${Date.now()}.xlsx"`);
@@ -441,7 +473,7 @@ export async function overallReport(req, res) {
           r.stock_quantity, r.total_distributed, r.remaining_stock,
           fmtCurrency(r.stock_value),
           fmtDate(r.last_distribution_date),
-        ], y, i % 2 === 1, doc.page.height);
+        ], y, i % 2 === 1, doc.page.height, COLORS.success);
       });
 
       y = drawTotalRow(doc, cols, 'TOTAL STOCK VALUE', fmtCurrency(grandTotal), y + 4, COLORS.success);
@@ -453,7 +485,7 @@ export async function overallReport(req, res) {
       ], y + 16);
 
       const pages = doc.bufferedPageRange();
-      for (let i = 0; i < pages.count; i++) { doc.switchToPage(i); drawFooter(doc); }
+      for (let i = 0; i < pages.count; i++) { doc.switchToPage(i); drawFooter(doc, i + 1, pages.count); }
       doc.end();
       return;
     }
@@ -474,7 +506,7 @@ export async function overallReport(req, res) {
       { header: 'Stock Value',      key: 'val',   width: 16 },
       { header: 'Last Distributed', key: 'last',  width: 18 },
     ];
-    sheet.columns = colDefs;
+    sheet.columns = colDefs.map(({ key, width }) => ({ key, width }));
 
     addExcelTitleBlock(sheet, 'OVERALL ITEM REPORT', subtitle, colDefs.length);
     const hRow = sheet.addRow(colDefs.map(c => c.header));
@@ -487,13 +519,13 @@ export async function overallReport(req, res) {
         r.total_distributed, r.remaining_stock,
         parseFloat(r.stock_value || 0), fmtDate(r.last_distribution_date),
       ]);
-      row.getCell(3).numFmt = '₱#,##0.00';
-      row.getCell(7).numFmt = '₱#,##0.00';
+      row.getCell(3).numFmt = '"PHP" #,##0.00';
+      row.getCell(7).numFmt = '"PHP" #,##0.00';
       styleExcelRow(row, i % 2 === 1);
     });
 
     addExcelTotalRow(sheet, colDefs.length, 'TOTAL STOCK VALUE', grandTotal);
-    sheet.getCell(sheet.rowCount, colDefs.length).numFmt = '₱#,##0.00';
+    sheet.getCell(sheet.rowCount, colDefs.length).numFmt = '"PHP" #,##0.00';
 
     // Signatories
     if (prepared_by || reviewed_by || approved_by) {
@@ -505,6 +537,7 @@ export async function overallReport(req, res) {
       ]);
       sigRow.eachCell(c => { c.font = { bold: true, size: 9 }; });
     }
+    finalizeExcelSheet(sheet, hRow.number, colDefs.length);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="overall_report_${Date.now()}.xlsx"`);
@@ -575,7 +608,11 @@ export async function departmentReport(req, res) {
         // Category group row
         if (currentCat !== r.category_name) {
           currentCat = r.category_name;
-          if (y + 20 > doc.page.height - 60) { doc.addPage(); drawPageFrame(doc); y = 50; }
+          if (y + 20 > doc.page.height - 78) {
+            doc.addPage();
+            drawPageFrame(doc);
+            y = drawTableHeader(doc, cols, 42, COLORS.warning);
+          }
           const totalW = cols.reduce((s, c) => s + c.width, 0);
           doc.rect(40, y, totalW, 16).fill(COLORS.light);
           doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.primary)
@@ -587,13 +624,13 @@ export async function departmentReport(req, res) {
           r.category_name, r.item_name,
           fmtCurrency(r.unit_price), r.dept_distributed,
           fmtCurrency(r.dept_value), fmtDate(r.last_distribution_date),
-        ], y, i % 2 === 1, doc.page.height);
+        ], y, i % 2 === 1, doc.page.height, COLORS.warning);
       });
 
       y = drawTotalRow(doc, cols, 'GRAND TOTAL', fmtCurrency(grandTotal), y + 4, COLORS.warning);
 
       const pages = doc.bufferedPageRange();
-      for (let i = 0; i < pages.count; i++) { doc.switchToPage(i); drawFooter(doc); }
+      for (let i = 0; i < pages.count; i++) { doc.switchToPage(i); drawFooter(doc, i + 1, pages.count); }
       doc.end();
       return;
     }
@@ -612,7 +649,7 @@ export async function departmentReport(req, res) {
       { header: 'Total Value',      key: 'val',   width: 16 },
       { header: 'Last Distributed', key: 'last',  width: 18 },
     ];
-    sheet.columns = colDefs;
+    sheet.columns = colDefs.map(({ key, width }) => ({ key, width }));
 
     addExcelTitleBlock(sheet, 'DEPARTMENT DISTRIBUTION REPORT', subtitle, colDefs.length);
     const hRow = sheet.addRow(colDefs.map(c => c.header));
@@ -635,13 +672,14 @@ export async function departmentReport(req, res) {
         parseFloat(r.unit_price || 0), r.dept_distributed,
         parseFloat(r.dept_value || 0), fmtDate(r.last_distribution_date),
       ]);
-      row.getCell(3).numFmt = '₱#,##0.00';
-      row.getCell(5).numFmt = '₱#,##0.00';
+      row.getCell(3).numFmt = '"PHP" #,##0.00';
+      row.getCell(5).numFmt = '"PHP" #,##0.00';
       styleExcelRow(row, i % 2 === 1);
     });
 
     addExcelTotalRow(sheet, colDefs.length, 'GRAND TOTAL', grandTotal);
-    sheet.getCell(sheet.rowCount, colDefs.length).numFmt = '₱#,##0.00';
+    sheet.getCell(sheet.rowCount, colDefs.length).numFmt = '"PHP" #,##0.00';
+    finalizeExcelSheet(sheet, hRow.number, colDefs.length);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="dept_report_${department}_${Date.now()}.xlsx"`);
@@ -722,13 +760,13 @@ export async function allocationsReport(req, res) {
           r.allocated_by, r.quantity,
           (r.status || 'active').toUpperCase(),
           (r.purpose || '').substring(0, 40),
-        ], y, i % 2 === 1, doc.page.height);
+        ], y, i % 2 === 1, doc.page.height, COLORS.accent2);
       });
 
       y = drawTotalRow(doc, cols, 'TOTAL QUANTITY', totalQty, y + 4, COLORS.accent2);
 
       const pages = doc.bufferedPageRange();
-      for (let i = 0; i < pages.count; i++) { doc.switchToPage(i); drawFooter(doc); }
+      for (let i = 0; i < pages.count; i++) { doc.switchToPage(i); drawFooter(doc, i + 1, pages.count); }
       doc.end();
       return;
     }
@@ -749,7 +787,7 @@ export async function allocationsReport(req, res) {
       { header: 'Status',       key: 'stat',  width: 12 },
       { header: 'Purpose',      key: 'purp',  width: 30 },
     ];
-    sheet.columns = colDefs;
+    sheet.columns = colDefs.map(({ key, width }) => ({ key, width }));
 
     addExcelTitleBlock(sheet, 'ALLOCATIONS REPORT', subtitle, colDefs.length);
     const hRow = sheet.addRow(colDefs.map(c => c.header));
@@ -765,6 +803,7 @@ export async function allocationsReport(req, res) {
     });
 
     addExcelTotalRow(sheet, colDefs.length, 'TOTAL QUANTITY', totalQty);
+    finalizeExcelSheet(sheet, hRow.number, colDefs.length);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="allocations_report_${Date.now()}.xlsx"`);
@@ -814,7 +853,6 @@ export async function inventoryReport(req, res) {
       return acc;
     }, {});
 
-    const fmtMoney = (n) => `₱${parseFloat(n ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
     const fmtNum   = (n) => parseFloat(n ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
     const today    = new Date().toLocaleDateString('en-PH', { dateStyle: 'long' });
     const grandTotal = items.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0);
@@ -833,7 +871,7 @@ export async function inventoryReport(req, res) {
       doc.fontSize(13).font('Helvetica-Bold').fillColor('#1E3A5F')
          .text('CAUAYAN CITY WATER DISTRICT', 40, 40, { align: 'center', width: W });
       doc.fontSize(8).font('Helvetica').fillColor('#64748B')
-         .text('$166 Africano cor., Burgos Streets, District 2, Cauayan City 3305, Isabela Philippines', 40, 58, { align: 'center', width: W });
+         .text('#166 Africano cor., Burgos Streets, District 2, Cauayan City 3305, Isabela, Philippines', 40, 58, { align: 'center', width: W });
       doc.moveDown(0.5);
       doc.fontSize(11).font('Helvetica-Bold').fillColor('#1E3A5F')
          .text('INVENTORY OF STOCKS', 40, 78, { align: 'center', width: W });
@@ -852,53 +890,81 @@ export async function inventoryReport(req, res) {
         { label: 'Amount',           x: 480, w: 80  },
       ];
 
-      let y = 115;
-      // Header row
-      doc.rect(40, y, W, 16).fill('#1E3A5F');
-      cols.forEach(col => {
-        doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#FFFFFF')
-           .text(col.label, col.x + 2, y + 4, { width: col.w - 4, align: col.label === 'Amount' || col.label === 'Unit Price' || col.label === 'In Stock' ? 'right' : 'left' });
-      });
-      y += 16;
+      const drawInventoryTableHeader = (headerY) => {
+        doc.rect(40, headerY, W, 18).fill('#1E3A5F');
+        cols.forEach(col => {
+          doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#FFFFFF')
+             .text(col.label, col.x + 2, headerY + 5, {
+               width: col.w - 4,
+               align: ['Amount', 'Unit Price', 'In Stock'].includes(col.label) ? 'right' : 'left',
+               lineBreak: false,
+             });
+        });
+        return headerY + 18;
+      };
+
+      const startContinuationPage = () => {
+        doc.addPage();
+        doc.fontSize(9).font('Helvetica-Bold').fillColor('#1E3A5F')
+           .text('INVENTORY OF STOCKS (CONTINUED)', 40, 40, { align: 'center', width: W });
+        doc.fontSize(7.5).font('Helvetica').fillColor('#64748B')
+           .text(`Made as of ${today}`, 40, 53, { align: 'center', width: W });
+        return drawInventoryTableHeader(68);
+      };
+
+      const bottomLimit = () => doc.page.height - 76;
+      let y = drawInventoryTableHeader(115);
 
       let rowIdx = 0;
       Object.entries(grouped).forEach(([catName, catItems]) => {
         // Category header
-        if (y + 14 > doc.page.height - 40) { doc.addPage(); y = 40; }
-        doc.rect(40, y, W, 14).fill('#EFF6FF');
+        if (y + 18 > bottomLimit()) y = startContinuationPage();
+        doc.rect(40, y, W, 18).fill('#EFF6FF');
         doc.fontSize(8).font('Helvetica-Bold').fillColor('#1E3A5F')
-           .text(catName, 44, y + 3, { width: W - 8 });
-        y += 14;
+           .text(pdfText(catName), 44, y + 5, { width: W - 8, lineBreak: false, ellipsis: true });
+        y += 18;
 
         catItems.forEach(item => {
-          if (y + 13 > doc.page.height - 40) { doc.addPage(); y = 40; }
+          doc.fontSize(7.5).font('Helvetica');
+          const itemName = pdfText(item.name);
+          const rowHeight = Math.min(30, Math.max(16,
+            doc.heightOfString(itemName, { width: cols[1].w - 4, lineGap: 0 }) + 6));
+          if (y + rowHeight > bottomLimit()) {
+            y = startContinuationPage();
+            doc.rect(40, y, W, 16).fill('#EFF6FF');
+            doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#1E3A5F')
+               .text(`${pdfText(catName)} (continued)`, 44, y + 4, { width: W - 8, lineBreak: false, ellipsis: true });
+            y += 16;
+          }
           const bg = rowIdx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
-          doc.rect(40, y, W, 13).fill(bg);
-          doc.moveTo(40, y + 13).lineTo(W + 40, y + 13).lineWidth(0.3).strokeColor('#CBD5E1').stroke();
+          doc.rect(40, y, W, rowHeight).fill(bg);
+          doc.moveTo(40, y + rowHeight).lineTo(W + 40, y + rowHeight).lineWidth(0.3).strokeColor('#CBD5E1').stroke();
 
           doc.fontSize(7.5).font('Helvetica').fillColor('#1E293B');
-          doc.text(item.sku || '—',           cols[0].x + 2, y + 2.5, { width: cols[0].w - 4 });
-          doc.text(item.name,                  cols[1].x + 2, y + 2.5, { width: cols[1].w - 4 });
-          doc.text(item.unit || 'Pcs',         cols[2].x + 2, y + 2.5, { width: cols[2].w - 4 });
-          doc.text(String(item.quantity),      cols[3].x + 2, y + 2.5, { width: cols[3].w - 4, align: 'right' });
-          doc.text(fmtNum(item.unit_price),    cols[4].x + 2, y + 2.5, { width: cols[4].w - 4, align: 'right' });
-          doc.text(fmtNum(item.amount),        cols[5].x + 2, y + 2.5, { width: cols[5].w - 4, align: 'right' });
+          doc.text(pdfText(item.sku) || '-', cols[0].x + 2, y + 4, { width: cols[0].w - 4, lineBreak: false, ellipsis: true });
+          doc.text(itemName, cols[1].x + 2, y + 4, { width: cols[1].w - 4, height: rowHeight - 7, ellipsis: true });
+          doc.text(pdfText(item.unit) || 'Pcs', cols[2].x + 2, y + 4, { width: cols[2].w - 4, lineBreak: false, ellipsis: true });
+          doc.text(String(item.quantity), cols[3].x + 2, y + 4, { width: cols[3].w - 4, align: 'right', lineBreak: false });
+          doc.text(fmtNum(item.unit_price), cols[4].x + 2, y + 4, { width: cols[4].w - 4, align: 'right', lineBreak: false });
+          doc.text(fmtNum(item.amount), cols[5].x + 2, y + 4, { width: cols[5].w - 4, align: 'right', lineBreak: false });
 
-          y += 13;
+          y += rowHeight;
           rowIdx++;
         });
 
         // Category subtotal
         const catTotal = catItems.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0);
-        doc.rect(40, y, W, 12).fill('#DBEAFE');
+        if (y + 16 > bottomLimit()) y = startContinuationPage();
+        doc.rect(40, y, W, 16).fill('#DBEAFE');
         doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#1E3A5F')
-           .text(`Subtotal — ${catName}`, cols[1].x + 2, y + 2.5, { width: 240 })
-           .text(fmtNum(catTotal), cols[5].x + 2, y + 2.5, { width: cols[5].w - 4, align: 'right' });
-        y += 12;
+           .text(`Subtotal - ${pdfText(catName)}`, cols[1].x + 2, y + 4, { width: 240, lineBreak: false, ellipsis: true })
+           .text(fmtNum(catTotal), cols[5].x + 2, y + 4, { width: cols[5].w - 4, align: 'right', lineBreak: false });
+        y += 16;
       });
 
       // Grand Total
       y += 4;
+      if (y + 20 > bottomLimit()) y = startContinuationPage();
       doc.rect(40, y, W, 16).fill('#1E3A5F');
       doc.fontSize(9).font('Helvetica-Bold').fillColor('#FFFFFF')
          .text('GRAND TOTAL', cols[1].x + 2, y + 3.5, { width: 240 })
@@ -909,7 +975,7 @@ export async function inventoryReport(req, res) {
       for (let i = 0; i < range.count; i++) {
         doc.switchToPage(i);
         doc.fontSize(7).fillColor('#94A3B8')
-           .text(`Page ${i + 1} of ${range.count}`, 40, doc.page.height - 25, { align: 'right', width: W });
+           .text(`Page ${i + 1} of ${range.count}`, 40, doc.page.height - 62, { align: 'right', width: W, lineBreak: false });
       }
 
       doc.end();
@@ -938,7 +1004,7 @@ export async function inventoryReport(req, res) {
     ws.getCell('A1').alignment = { horizontal: 'center' };
     ws.getRow(1).height = 24;
 
-    ws.getCell('A2').value = '$166 Africano cor., Burgos Streets, District 2, Cauayan City 3305, Isabela Philippines';
+    ws.getCell('A2').value = '#166 Africano cor., Burgos Streets, District 2, Cauayan City 3305, Isabela, Philippines';
     ws.getCell('A2').font = { size: 8, color: { argb: 'FF64748B' } };
     ws.getCell('A2').alignment = { horizontal: 'center' };
 
@@ -966,33 +1032,36 @@ export async function inventoryReport(req, res) {
       ws.mergeCells(`A${catRow.number}:F${catRow.number}`);
       catRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
       catRow.getCell(1).font = { bold: true, size: 9, color: { argb: 'FF1E3A5F' } };
-      catRow.height = 16;
+      catRow.getCell(1).alignment = { vertical: 'middle', wrapText: true };
+      catRow.height = 20;
 
       catItems.forEach((item, i) => {
         const r = ws.addRow([
-          item.sku || '—',
+          item.sku || '-',
           item.name,
           item.unit || 'Pcs',
           item.quantity,
           parseFloat(item.unit_price ?? 0),
           parseFloat(item.amount ?? 0),
         ]);
-        r.height = 15;
+        r.height = 22;
         const bg = i % 2 === 0 ? 'FFFFFFFF' : 'FFF8FAFC';
         r.eachCell((cell, col) => {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
           cell.font = { size: 9 };
           cell.border = { bottom: { style: 'hair', color: { argb: 'FFCBD5E1' } } };
-          if (col >= 4) { cell.alignment = { horizontal: 'right' }; cell.numFmt = '#,##0.00'; }
+          cell.alignment = { vertical: 'middle', wrapText: col === 2 };
+          if (col === 4) { cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.numFmt = '#,##0.##'; }
+          if (col >= 5) { cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.numFmt = '"PHP" #,##0.00'; }
         });
       });
 
       // Subtotal
       const catTotal = catItems.reduce((s, i) => s + parseFloat(i.amount ?? 0), 0);
-      const stRow = ws.addRow(['', `Subtotal — ${catName}`, '', '', '', catTotal]);
+      const stRow = ws.addRow(['', `Subtotal - ${catName}`, '', '', '', catTotal]);
       stRow.getCell(2).font = { bold: true, size: 9, color: { argb: 'FF1E3A5F' } };
       stRow.getCell(6).font = { bold: true, size: 9, color: { argb: 'FF1E3A5F' } };
-      stRow.getCell(6).numFmt = '#,##0.00';
+      stRow.getCell(6).numFmt = '"PHP" #,##0.00';
       stRow.getCell(6).alignment = { horizontal: 'right' };
       stRow.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }; });
     });
@@ -1004,8 +1073,9 @@ export async function inventoryReport(req, res) {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
     });
-    gtRow.getCell(6).numFmt = '#,##0.00';
+    gtRow.getCell(6).numFmt = '"PHP" #,##0.00';
     gtRow.getCell(6).alignment = { horizontal: 'right' };
+    finalizeExcelSheet(ws, hRow.number, 6, false);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="inventory_report_${Date.now()}.xlsx"`);
@@ -1049,4 +1119,25 @@ export async function inventoryPreview(req, res) {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+}
+
+function finalizeExcelSheet(sheet, headerRowNumber, colCount, enableFilter = true) {
+  sheet.views = [{ state: 'frozen', ySplit: headerRowNumber, showGridLines: false }];
+  if (enableFilter) {
+    sheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: Math.max(sheet.rowCount, headerRowNumber), column: colCount },
+    };
+  }
+  sheet.pageSetup = {
+    orientation: colCount > 6 ? 'landscape' : 'portrait',
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: { left: 0.3, right: 0.3, top: 0.55, bottom: 0.55, header: 0.2, footer: 0.2 },
+    printTitlesRow: `${headerRowNumber}:${headerRowNumber}`,
+  };
+  sheet.headerFooter.oddFooter = '&LCCWD Inventory Management System&CConfidential&RPage &P of &N';
+  sheet.properties.defaultRowHeight = 20;
 }

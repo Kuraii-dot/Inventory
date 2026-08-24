@@ -6,6 +6,7 @@ import {
   fetchItemsByClassification, fetchItemsByCategory,
   validateStock,
 } from '../api/items.js';
+import AppIcon from './AppIcon.jsx';
 
 const EMPTY_ROW = { category_id: '', classification_id: '', item_id: '', quantity: '' };
 
@@ -124,10 +125,11 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
               stockWarning && !stockWarning.valid ? 'border-red-500' : 'border-slate-200'
             }`} placeholder="0" />
           {stockWarning && (
-            <p className={`text-xs mt-1 ${stockWarning.valid ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-xs mt-1 flex items-center gap-1 ${stockWarning.valid ? 'text-green-600' : 'text-red-600'}`}>
+              <AppIcon name={stockWarning.valid ? 'check' : 'alert'} size={13} />
               {stockWarning.valid
-                ? `✓ ${stockWarning.remaining} remaining`
-                : `⚠️ ${stockWarning.message} (Available: ${stockWarning.available})`}
+                ? `${stockWarning.remaining} remaining`
+                : `${stockWarning.message} (Available: ${stockWarning.available})`}
             </p>
           )}
         </div>

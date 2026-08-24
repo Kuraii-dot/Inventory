@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import Modal from '../Modal.jsx';
 import { createSupplier, updateSupplier, deleteSupplier } from '../../api/items.js';
+import AppIcon from '../AppIcon.jsx';
 
 export default function SupplierModal({ open, onClose, suppliers, onRefresh, showToast }) {
   const [newName, setNewName]   = useState('');
@@ -91,11 +92,11 @@ export default function SupplierModal({ open, onClose, suppliers, onRefresh, sho
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => { setEditId(sup.id); setEditName(sup.name); }}
                       className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
-                      ✏️ Edit
+                      <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                     </button>
                     <button onClick={() => handleDelete(sup.id)}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium">
-                      🗑️ Delete
+                      <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                     </button>
                   </div>
                 </>

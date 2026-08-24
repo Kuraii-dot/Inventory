@@ -11,6 +11,7 @@ import EditItemModal                    from '../components/items/EditItemModal.
 import CategoryModal                    from '../components/items/CategoryModal.jsx';
 import SupplierModal                    from '../components/items/SupplierModal.jsx';
 import ClassificationModal              from '../components/items/ClassificationModal.jsx';
+import AppIcon                          from '../components/AppIcon.jsx';
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -119,7 +120,7 @@ export default function Items() {
     if (!confirm(`Deactivate "${name}"? All historical data will be preserved.`)) return;
     try {
       const result = await deleteItem(id);
-      showToast(`✅ ${result.message}`, 'success');
+      showToast(result.message, 'success');
       loadItems(appliedFilters, page, sortField, sortDir);
       loadDeactivated();
     } catch (err) {
@@ -131,7 +132,7 @@ export default function Items() {
     if (!confirm(`Restore "${name}"?`)) return;
     try {
       const result = await restoreItem(id);
-      showToast(`✅ ${result.message}`, 'success');
+      showToast(result.message, 'success');
       loadItems(appliedFilters, page, sortField, sortDir);
       loadDeactivated();
     } catch (err) {
@@ -146,33 +147,33 @@ export default function Items() {
   const selectCls     = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
-      <div className="max-w-[1900px] mx-auto px-8 py-8">
+    <div className="app-page min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+      <div className="app-page-inner max-w-[1900px] mx-auto px-8 py-8">
 
         {/* Header */}
-        <div className="flex justify-between items-start mb-8">
+        <div className="app-page-header flex justify-between items-start mb-8">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-slate-700 to-blue-600 bg-clip-text text-transparent mb-3">
               Manage Items Inventory
             </h1>
             <p className="text-slate-500 text-sm">Manage your inventory items and stock levels</p>
           </div>
-          <div className="flex gap-3 mt-4">
+          <div className="app-page-actions flex gap-3 mt-4">
             <button onClick={() => setShowClassificationModal(true)}
               className="px-5 py-2.5 bg-white text-blue-600 font-medium rounded-xl border-2 border-blue-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>🧩</span><span>Classifications</span>
+              <AppIcon name="layers" /><span>Classifications</span>
             </button>
             <button onClick={() => setShowCategoryModal(true)}
               className="px-5 py-2.5 bg-white text-emerald-600 font-medium rounded-xl border-2 border-emerald-200 hover:border-emerald-300 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>📂</span><span>Categories</span>
+              <AppIcon name="categories" /><span>Categories</span>
             </button>
             <button onClick={() => setShowSupplierModal(true)}
               className="px-5 py-2.5 bg-white text-violet-600 font-medium rounded-xl border-2 border-violet-200 hover:border-violet-300 hover:shadow-lg transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span>🚚</span><span>Suppliers</span>
+              <AppIcon name="truck" /><span>Suppliers</span>
             </button>
             <button onClick={() => setShowAddItem(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-slate-700 to-blue-600 text-white font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
-              <span className="text-lg">+</span><span>Add Item</span>
+              className="app-primary-button px-6 py-2.5 bg-gradient-to-r from-slate-700 to-blue-600 text-white font-semibold rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-2">
+              <AppIcon name="plus" /><span>Add Item</span>
             </button>
           </div>
         </div>
@@ -182,7 +183,7 @@ export default function Items() {
           <div className="mb-6 bg-gradient-to-r from-amber-50 to-red-50 border-l-4 border-amber-500 rounded-xl p-5 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                <span className="text-amber-600 text-xl">⚠️</span>
+                <AppIcon name="alert" size={20} className="text-amber-600" />
               </div>
               <div>
                 <p className="font-semibold text-amber-900">Low Stock Alert</p>
@@ -200,7 +201,7 @@ export default function Items() {
                 ? 'bg-blue-600 text-white border-blue-600 shadow-md'
                 : 'bg-white text-blue-600 border-blue-200 hover:border-blue-400 hover:shadow-md'
             }`}>
-            <span>{showFilters ? '✕' : '🔍'}</span>
+            <AppIcon name={showFilters ? 'x' : 'filter'} />
             <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
             {hasFilters && !showFilters && (
               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">Active</span>
@@ -242,7 +243,7 @@ export default function Items() {
 
         {/* Collapsible Filter Drawer */}
         {showFilters && (
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6 mb-6 animate-fade-in">
+          <div className="app-page-panel bg-white rounded-2xl shadow-sm border border-blue-100 p-6 mb-6 animate-fade-in">
             <form onSubmit={handleApplyFilters} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -251,7 +252,7 @@ export default function Items() {
                     <input type="text" name="search" placeholder="Search by name..."
                       value={filters.search} onChange={handleFilterChange}
                       className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                    <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   </div>
                 </div>
                 <div>
@@ -308,7 +309,7 @@ export default function Items() {
                 )}
                 <button type="button" onClick={() => setShowFilters(false)}
                   className="ml-auto px-4 py-2.5 text-slate-400 hover:text-slate-600 text-sm transition-colors">
-                  ✕ Hide
+                  <AppIcon name="x" size={14} className="app-icon-inline mr-1" /> Hide
                 </button>
               </div>
             </form>
@@ -323,7 +324,7 @@ export default function Items() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+        <div className="app-page-panel bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
           <div className="overflow-x-auto">
             <table style={{ minWidth: '1300px' }} className="w-full">
               <thead>
@@ -340,7 +341,7 @@ export default function Items() {
                   <tr>
                     <td colSpan="10" className="py-16 text-center">
                       <div className="flex flex-col items-center">
-                        <span className="text-3xl mb-4">📦</span>
+                        <AppIcon name="packageOpen" size={34} className="mb-4 text-slate-300" />
                         <p className="text-slate-500 font-medium">No items found</p>
                         <p className="text-slate-400 text-sm mt-1">Try adjusting your filters or add a new item</p>
                       </div>
@@ -352,7 +353,7 @@ export default function Items() {
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-blue-300 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm">📦</span>
+                          <AppIcon name="package" size={15} />
                         </div>
                         <span className="font-semibold text-slate-800 whitespace-nowrap">{item.name}</span>
                       </div>
@@ -390,7 +391,7 @@ export default function Items() {
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <button onClick={() => setEditItemId(item.id)}
                           className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
-                          ✏️ Edit
+                          <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                         </button>
                         <button
                           onClick={() => handleDelete(item.id, item.name)}
@@ -401,7 +402,7 @@ export default function Items() {
                               ? 'bg-red-100 text-red-700 hover:bg-red-200'
                               : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                           }`}>
-                          🗑️ {hasRole('master_admin') ? 'Deactivate' : 'Delete'}
+                          <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> {hasRole('master_admin') ? 'Deactivate' : 'Delete'}
                         </button>
                       </div>
                     </td>
@@ -444,7 +445,7 @@ export default function Items() {
             <button onClick={() => setShowDeactivated(v => !v)}
               className="flex items-center gap-2 text-slate-500 hover:text-slate-700 text-sm font-medium mb-3">
               <span>{showDeactivated ? '⮟' : '⮞'}</span>
-              <span>🗃️ Deactivated Items ({deactivated.length})</span>
+              <span className="flex items-center gap-2"><AppIcon name="archive" /> Deactivated Items ({deactivated.length})</span>
             </button>
             {showDeactivated && (
               deactivated.length === 0 ? (
@@ -470,7 +471,7 @@ export default function Items() {
                           <td className="py-3 px-4">
                             <button onClick={() => handleRestore(item.id, item.name)}
                               className="px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 text-xs font-medium">
-                              ♻️ Restore
+                              <AppIcon name="restore" size={13} className="app-icon-inline mr-1" /> Restore
                             </button>
                           </td>
                         </tr>
