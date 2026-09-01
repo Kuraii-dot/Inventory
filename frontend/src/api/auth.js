@@ -2,6 +2,7 @@
 // Replaces: the form POST in index.php and logout.php redirect
 
 import client from './client.js';
+import { inventoryAuthEmail, supabase } from './supabase.js';
 
 /**
  * Login — converted from the POST handler in index.php
@@ -9,8 +10,18 @@ import client from './client.js';
  * React: sends JSON → receives { token, user }
  */
 export async function loginRequest(username, password) {
-  const { data } = await client.post('/auth/login', { username, password });
-  return data; // { token, user: { id, username, role } }
+  const { error } = await supabase.auth.signInWithPassword({
+    email: inventoryAuthEmail(username),
+    password,
+  });
+  if (error) throw error;
+  const { data } = await client.get('/auth/me');
+  // Do not use /auth/me itself as the event: it is also called during session
+  // restoration and would create duplicate login records.
+  await client.post('/auth/login-event').catch(error => {
+    console.error('Could not record login activity:', error);
+  });
+  return data;
 }
 
 /**
@@ -19,7 +30,11 @@ export async function loginRequest(username, password) {
  * React: tells server, then client removes token
  */
 export async function logoutRequest() {
-  await client.post('/auth/logout');
+  await client.post('/auth/logout-event').catch(error => {
+    console.error('Could not record logout activity:', error);
+  });
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
 }
 
 /**

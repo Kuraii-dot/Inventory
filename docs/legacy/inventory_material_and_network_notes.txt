@@ -1,0 +1,19 @@
+Important reserve 192.168.33.246 for this server in your router. If its IP changes, the Tauri installer must be rebuilt with the new address.
+
+
+
+In the 3/4 inch material kit, it should be the "G.I. St. Elbow '1'' S.40'" 
+not "G.I. St. Elbow '1 ¼'' S.40'"
+
+and it should also be
+G.I. Union Patente, '1'' S.40' 
+not 
+G.I. Union Patente, '1 ¼'' S.40'  
+
+It should be
+(there is no item like this right now but i'd like to address it immediately)G.I. Nipple '¾'' x 3''  
+not 
+G.I. Nipple '1 ¾'' x 8'' 
+
+Tailscape IP address 
+100.117.98.112

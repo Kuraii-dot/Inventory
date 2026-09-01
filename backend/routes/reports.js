@@ -8,6 +8,7 @@ import {
   allocationsReport,
   inventoryReport,
   inventoryPreview,
+  inspectionRequestsReport,
 } from '../controllers/reportsController.js';
 
 const router = Router();
@@ -30,5 +31,8 @@ router.get('/inventory', inventoryReport);
 
 // GET /api/reports/inventory-preview
 router.get('/inventory-preview', inventoryPreview);
+
+// POST /api/reports/inspections
+router.post('/inspections', inspectionRequestsReport);
 
 export default router;

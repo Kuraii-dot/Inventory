@@ -14,6 +14,9 @@ import ReportModal  from '../components/ReportModal.jsx';
 import CombinationsModal from '../components/distributions/CombinationsModal.jsx';
 import client       from '../api/client.js';
 import AppIcon      from '../components/AppIcon.jsx';
+import { InlineSkeleton, TableSkeletonRows } from '../components/LoadingSkeletons.jsx';
+import SearchableSelect from '../components/SearchableSelect.jsx';
+import usePersistentState from '../hooks/usePersistentState.js';
 
 const DEPARTMENTS = ['Admin', 'Engineering', 'Commercial', 'Finance'];
 
@@ -31,7 +34,7 @@ export default function Distributions() {
 
   const [records,    setRecords]    = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [filters,    setFilters]    = useState({ search: '', timeframe: 'all', startDate: '', endDate: '' });
+  const [filters,    setFilters]    = usePersistentState('inventory.filters.distributions', { search: '', timeframe: 'all', startDate: '', endDate: '' });
   const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -56,8 +59,10 @@ export default function Distributions() {
   });
   const [distItems,   setDistItems]   = useState([{ category_id: '', classification_id: '', item_id: '', quantity: '' }]);
   const [distLoading, setDistLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [editForm,   setEditForm]   = useState({});
   const [returnForm, setReturnForm] = useState({ return_quantity: '', return_reason: '' });
+  const firstLoad = loading && records.length === 0;
 
   // ── Load distributions ────────────────────────────────────
   const loadDistributions = useCallback(async (pg = 1) => {
@@ -147,16 +152,24 @@ export default function Distributions() {
 
   async function handleEditSubmit(e) {
     e.preventDefault();
+    const requestedQuantity = Number(editForm.quantity);
+    if (!Number.isSafeInteger(requestedQuantity) || requestedQuantity <= 0) {
+      showToast('Enter a valid distribution quantity.', 'error');
+      return;
+    }
+    setEditLoading(true);
     try {
-      await updateDistribution(editData.id, editForm);
-      showToast('Distribution updated.');
+      const result = await updateDistribution(editData.id, { ...editForm, quantity: requestedQuantity });
+      showToast(result.message || 'Distribution updated.');
       setEditData(null); loadDistributions(page);
     } catch (err) { showToast(err.response?.data?.message || 'Error updating.', 'error'); }
+    finally { setEditLoading(false); }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Delete this distribution? Stock will be restored.')) return;
-    try { await deleteDistribution(id); showToast('Deleted.'); loadDistributions(page); }
+  async function handleDelete(row) {
+    const warning = `WARNING: Delete this distribution?\n\n${row.item_name} (Item #${row.item_id})\nQuantity: ${row.quantity}\n\nThe stock will be restored to this exact item record, but the distribution record will be permanently removed.`;
+    if (!confirm(warning)) return;
+    try { await deleteDistribution(row.id); showToast('Deleted.'); loadDistributions(page); }
     catch { showToast('Error deleting.', 'error'); }
   }
 
@@ -200,7 +213,9 @@ export default function Distributions() {
     return (
       <>
         <td className="py-3 px-4 text-xs text-slate-600 whitespace-nowrap">{fmtDate(row.distributed_at)}<br/><span className="text-slate-400">{fmtTime(row.distributed_at)}</span></td>
-        <td className="py-3 px-4 text-sm font-medium text-slate-900 whitespace-nowrap">{row.item_name}</td>
+        <td className="py-3 px-4 text-sm font-medium text-slate-900 whitespace-nowrap">
+          {row.item_name}<span className="block text-[11px] font-semibold text-slate-400">Item #{row.item_id}</span>
+        </td>
         <td className="py-3 px-4 font-semibold text-red-600 text-center">{row.quantity}</td>
         <td className="py-3 px-4 font-medium text-emerald-600 whitespace-nowrap">₱{parseFloat(row.total_value ?? 0).toFixed(2)}</td>
         <td className="py-3 px-4 text-sm text-slate-700 whitespace-nowrap">{row.category_name}</td>
@@ -211,7 +226,7 @@ export default function Distributions() {
         <td className="py-3 px-4">
           <div className="flex gap-1 whitespace-nowrap">
             <button onClick={() => openEdit(row.id)} className="px-2 py-1.5 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 text-xs font-medium"><AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit</button>
-            <button onClick={() => handleDelete(row.id)} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium"><AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete</button>
+            <button onClick={() => handleDelete(row)} className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium"><AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete</button>
             <button onClick={() => openReturn(row.id)} className="px-2 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-xs font-medium"><AppIcon name="return" size={13} className="app-icon-inline mr-1" /> Return</button>
           </div>
         </td>
@@ -257,14 +272,13 @@ export default function Distributions() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-2">Timeframe</label>
-                <select value={filters.timeframe} onChange={e => setFilters(f => ({...f, timeframe: e.target.value}))} className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent transition">
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="year">This Year</option>
-                  <option value="custom">Custom Range</option>
-                </select>
+                <SearchableSelect value={filters.timeframe} allowEmpty={false}
+                  onChange={value => setFilters(f => ({ ...f, timeframe: value }))}
+                  placeholder="Select timeframe" searchPlaceholder="Search timeframes..."
+                  options={[
+                    ['all','All Time'], ['today','Today'], ['week','This Week'],
+                    ['month','This Month'], ['year','This Year'], ['custom','Custom Range'],
+                  ].map(([value, label]) => ({ value, label }))} />
               </div>
               <div className="flex items-end">
                 <button type="submit" className="w-full bg-gradient-to-r from-yellow-400 to-red-400 text-white py-2.5 px-4 rounded-lg font-medium hover:shadow-lg transition-all duration-300 hover:scale-105"><AppIcon name="search" size={15} className="app-icon-inline mr-1" /> Search</button>
@@ -284,7 +298,7 @@ export default function Distributions() {
             )}
           </form>
           <div className="mt-4 pt-4 border-t border-slate-100">
-            <span className="text-sm font-medium text-slate-600">{loading ? 'Loading...' : `${totalCount} record${totalCount !== 1 ? 's' : ''} found`}</span>
+            <span className="text-sm font-medium text-slate-600">{firstLoad ? <InlineSkeleton /> : loading ? `Refreshing ${totalCount} records…` : `${totalCount} record${totalCount !== 1 ? 's' : ''} found`}</span>
           </div>
         </div>
 
@@ -297,9 +311,9 @@ export default function Distributions() {
                   {COLS.map(h => <th key={h} className="py-4 px-4 text-center text-xs font-semibold uppercase tracking-wider whitespace-nowrap">{h}</th>)}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan={COLS.length} className="py-16 text-center text-slate-400 animate-pulse">Loading...</td></tr>
+              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${loading && !firstLoad ? 'opacity-60' : ''}`} aria-busy={loading}>
+                {firstLoad ? (
+                  <TableSkeletonRows columns={COLS.length} rows={7} />
                 ) : (
                   <GroupedTable rows={records} groupBy={groupKey} renderHeader={renderHeader} renderRow={renderRow} columns={COLS} accentClass="border-red-300"/>
                 )}
@@ -330,10 +344,10 @@ export default function Distributions() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Department *</label>
-                <select required value={distForm.department} onChange={e => setDistForm(f => ({...f, department: e.target.value}))} className={inputCls}>
-                  <option value="">Select Department</option>
-                  {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
-                </select>
+                <SearchableSelect required value={distForm.department}
+                  onChange={value => setDistForm(f => ({ ...f, department: value }))}
+                  placeholder="Select Department" searchPlaceholder="Search departments..."
+                  options={DEPARTMENTS.map(department => ({ value: department, label: department }))} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4 mb-4">
@@ -373,13 +387,13 @@ export default function Distributions() {
               <p className="text-sm text-slate-400">No combinations saved yet. Create one via the Combinations button.</p>
             ) : (
               <div className="flex gap-3 items-center">
-                <select value={selectedCombo} onChange={e => setSelectedCombo(e.target.value)}
-                  className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition text-sm bg-white">
-                  <option value="">— Select a combination —</option>
-                  {combinations.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.item_count} item{c.item_count !== 1 ? 's' : ''})</option>
-                  ))}
-                </select>
+                <SearchableSelect value={selectedCombo} onChange={setSelectedCombo}
+                  className="flex-1" placeholder="Select a combination"
+                  searchPlaceholder="Search combinations..."
+                  options={combinations.map(combination => ({
+                    value: combination.id,
+                    label: `${combination.name} (${combination.item_count} item${combination.item_count !== 1 ? 's' : ''})`,
+                  }))} />
                 <button type="button" disabled={!selectedCombo} onClick={handleLoadCombo}
                   className="px-4 py-2.5 bg-gradient-to-r from-yellow-400 to-red-400 text-white font-medium rounded-lg hover:shadow-md transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
                   <AppIcon name="zap" /><span>Load Items</span>
@@ -408,6 +422,21 @@ export default function Distributions() {
       {/* Edit Modal */}
       <Modal open={!!editData} onClose={() => setEditData(null)} title="Edit Distribution" subtitle="Modify distribution details" maxWidth="max-w-2xl">
         <form onSubmit={handleEditSubmit} className="space-y-4">
+          {editData && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Selected inventory item</p>
+              <p className="mt-1 font-semibold text-slate-900">{editData.item_name}</p>
+              <p className="mt-1 text-xs text-slate-600">Changing the issued quantity will automatically deduct or return the difference in inventory stock.</p>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Distributed Quantity *</label>
+            <input type="number" min="1" step="1" required
+              value={editForm.quantity ?? ''}
+              onChange={e => setEditForm(f => ({ ...f, quantity: e.target.value }))}
+              className={inputCls}/>
+            {editData && <p className="mt-1.5 text-xs text-slate-500">Originally recorded: {editData.quantity} {editData.quantity === 1 ? 'unit' : 'units'}</p>}
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Recipient *</label>
@@ -415,10 +444,10 @@ export default function Distributions() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Department *</label>
-              <select required value={editForm.department ?? ''} onChange={e => setEditForm(f => ({...f, department: e.target.value}))} className={inputCls}>
-                <option value="">Select Department</option>
-                {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
-              </select>
+              <SearchableSelect required value={editForm.department ?? ''}
+                onChange={value => setEditForm(f => ({ ...f, department: value }))}
+                placeholder="Select Department" searchPlaceholder="Search departments..."
+                options={DEPARTMENTS.map(department => ({ value: department, label: department }))} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -437,7 +466,9 @@ export default function Distributions() {
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button type="button" onClick={() => setEditData(null)} className="px-6 py-2.5 bg-slate-100 text-slate-600 font-medium rounded-lg hover:bg-slate-200 transition-colors">Cancel</button>
-            <button type="submit" className="px-8 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-300">Update Distribution</button>
+            <button type="submit" disabled={editLoading} className="px-8 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60">
+              {editLoading ? 'Updating stock...' : 'Update Distribution'}
+            </button>
           </div>
         </form>
       </Modal>
@@ -448,6 +479,7 @@ export default function Distributions() {
           {returnData && (
             <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
               <p className="text-sm text-slate-600 mb-1"><strong>Item:</strong> {returnData.item_name}</p>
+              <p className="text-sm font-semibold text-slate-700 mb-1"><strong>Inventory record:</strong> Item #{returnData.item_id}</p>
               <p className="text-sm text-slate-600"><strong>Distributed Quantity:</strong> {returnData.quantity}</p>
             </div>
           )}

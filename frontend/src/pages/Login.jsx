@@ -19,7 +19,7 @@ export default function Login() {
     if (!username.trim() || !password.trim()) { setError('All fields are required.'); return; }
     setLoading(true);
     try { await login(username, password); navigate('/dashboard'); }
-    catch (err) { setError(err.response?.data?.message || 'Invalid username or password.'); }
+    catch (err) { setError(err.response?.data?.message || err.message || 'Invalid username or password.'); }
     finally { setLoading(false); }
   }
 

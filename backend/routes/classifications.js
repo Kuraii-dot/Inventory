@@ -3,15 +3,16 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { getClassifications, addClassification } from '../controllers/classificationsController.js';
 import pool from '../db/pool.js';
+import { logCreate, logDelete, logUpdate } from '../middleware/activityLogger.js';
 
 const router = Router();
 router.use(authenticate);
 
 router.get('/',  getClassifications);
-router.post('/', addClassification);
+router.post('/', logCreate('classifications', req => `Added classification: ${req.body.classification_name}`), addClassification);
 
 // PUT /api/classifications/:id — update classification name
-router.put('/:id', async (req, res) => {
+router.put('/:id', logUpdate('classifications', req => `Updated classification ID: ${req.params.id}`), async (req, res) => {
   const { id } = req.params;
   const { classification_name } = req.body;
   if (!classification_name?.trim()) {
@@ -26,7 +27,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/classifications/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', logDelete('classifications', req => `Deleted classification ID: ${req.params.id}`), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('DELETE FROM classifications WHERE id = $1', [id]);

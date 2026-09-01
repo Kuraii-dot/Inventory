@@ -1,12 +1,14 @@
 // frontend/src/pages/Admin.jsx
 // Master Admin Dashboard — only accessible to master_admin role
 
-import { useState, useEffect } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast, ToastContainer } from '../hooks/useToast.jsx';
 import Modal from '../components/Modal.jsx';
 import AppIcon from '../components/AppIcon.jsx';
+import SearchableSelect from '../components/SearchableSelect.jsx';
+import usePersistentState from '../hooks/usePersistentState.js';
 import {
   fetchAdminStats, fetchActivityLog, fetchItemMovement,
   fetchUserReport, fetchUsers, createUser, updateUser, deleteUser,
@@ -22,8 +24,40 @@ const ACTION_COLORS = {
   UPDATE: 'bg-blue-100 text-blue-700',
   DELETE: 'bg-red-100 text-red-700',
   LOGIN:  'bg-purple-100 text-purple-700',
+  LOGOUT: 'bg-slate-100 text-slate-700',
   RETURN: 'bg-amber-100 text-amber-700',
 };
+
+const AUDIT_HIDDEN_FIELDS = new Set(['created_at', 'updated_at', 'password']);
+
+function auditObject(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value); } catch { return null; }
+  }
+  return typeof value === 'object' ? value : null;
+}
+
+function auditComparable(value) {
+  return value && typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+}
+
+function auditDisplay(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return typeof value === 'object' ? JSON.stringify(value) : String(value);
+}
+
+function auditChanges(log) {
+  const before = auditObject(log.old_data);
+  const after = auditObject(log.new_data);
+  if (!before && !after) return [];
+  const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+  return [...keys]
+    .filter(key => !AUDIT_HIDDEN_FIELDS.has(key))
+    .filter(key => auditComparable(before?.[key]) !== auditComparable(after?.[key]))
+    .map(key => ({ key, before: before?.[key], after: after?.[key] }));
+}
 
 const TYPE_COLORS = {
   IN:    'bg-emerald-100 text-emerald-700',
@@ -38,23 +72,24 @@ export default function Admin() {
   const navigate  = useNavigate();
   const { toasts, showToast } = useToast();
 
-  const [activeTab,  setActiveTab]  = useState('overview');
+  const [activeTab,  setActiveTab]  = usePersistentState('inventory.filters.admin.activeTab', 'overview');
   const [stats,      setStats]      = useState(null);
 
   // Activity log state
   const [logs,       setLogs]       = useState([]);
-  const [logFilters, setLogFilters] = useState({ search: '', module: '', action: '', start_date: '', end_date: '' });
+  const [logFilters, setLogFilters] = usePersistentState('inventory.filters.admin.activity', { search: '', module: '', action: '', start_date: '', end_date: '' });
   const [logPage,    setLogPage]    = useState(1);
   const [logTotal,   setLogTotal]   = useState(0);
   const [logPages,   setLogPages]   = useState(1);
   const [logLoading, setLogLoading] = useState(false);
+  const [expandedLog, setExpandedLog] = useState(null);
 
   // Item movement state
   const [movements,  setMovements]  = useState([]);
   const [movLoading, setMovLoading] = useState(false);
-  const [movType,    setMovType]    = useState('');
-  const [movFrom,    setMovFrom]    = useState('');
-  const [movTo,      setMovTo]      = useState('');
+  const [movType,    setMovType]    = usePersistentState('inventory.filters.admin.movementType', '');
+  const [movFrom,    setMovFrom]    = usePersistentState('inventory.filters.admin.movementFrom', '');
+  const [movTo,      setMovTo]      = usePersistentState('inventory.filters.admin.movementTo', '');
   const [movExporting, setMovExporting] = useState(false);
 
   // Users state
@@ -65,7 +100,7 @@ export default function Admin() {
   const [userLoading,setUserLoading]= useState(false);
 
   // User report state
-  const [reportUser,  setReportUser]  = useState('');
+  const [reportUser,  setReportUser]  = usePersistentState('inventory.filters.admin.reportUser', '');
   const [reportData,  setReportData]  = useState(null);
   const [reportLoading,setReportLoading] = useState(false);
 
@@ -191,7 +226,7 @@ export default function Admin() {
   }
 
   async function handleDeleteUser(id, username) {
-    if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+    if (!confirm(`WARNING: Permanently delete user "${username}"?\n\nThey will lose Inventory access immediately. This action cannot be undone.`)) return;
     try {
       await deleteUser(id);
       showToast(`User "${username}" deleted.`, 'success');
@@ -309,23 +344,17 @@ export default function Admin() {
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Module</label>
-                  <select value={logFilters.module} onChange={e => setLogFilters(f => ({ ...f, module: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                    <option value="">All Modules</option>
-                    {['auth','items','distributions','allocations','suppliers','categories','classifications','combinations'].map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                  <SearchableSelect value={logFilters.module}
+                    onChange={value => setLogFilters(f => ({ ...f, module: value }))}
+                    placeholder="All Modules" searchPlaceholder="Search modules..."
+                    options={['auth','items','distributions','allocations','suppliers','categories','classifications','combinations'].map(module => ({ value: module, label: module }))} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Action</label>
-                  <select value={logFilters.action} onChange={e => setLogFilters(f => ({ ...f, action: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                    <option value="">All Actions</option>
-                    {['CREATE','UPDATE','DELETE','LOGIN','RETURN'].map(a => (
-                      <option key={a} value={a}>{a}</option>
-                    ))}
-                  </select>
+                  <SearchableSelect value={logFilters.action}
+                    onChange={value => setLogFilters(f => ({ ...f, action: value }))}
+                    placeholder="All Actions" searchPlaceholder="Search actions..."
+                    options={['CREATE','UPDATE','DELETE','LOGIN','LOGOUT','RETURN'].map(action => ({ value: action, label: action }))} />
                 </div>
               </div>
               {/* Row 2 - Date range */}
@@ -358,30 +387,62 @@ export default function Admin() {
                 <table className="app-table-large w-full">
                   <thead>
                     <tr className="bg-slate-900 text-slate-400 text-xs uppercase">
-                      {['Date','User','Action','Module','Description','IP'].map(h => (
+                      {['Date','User','Action','Module','Description','Changes','IP'].map(h => (
                         <th key={h} className="py-4 px-4 text-left font-semibold">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
                     {logLoading ? (
-                      <tr><td colSpan="6" className="py-12 text-center text-slate-400 animate-pulse">Loading...</td></tr>
+                      <tr><td colSpan="7" className="py-12 text-center text-slate-400 animate-pulse">Loading...</td></tr>
                     ) : logs.length === 0 ? (
-                      <tr><td colSpan="6" className="py-12 text-center text-slate-400">No activity found</td></tr>
-                    ) : logs.map(log => (
-                      <tr key={log.id} className="hover:bg-slate-750 transition-colors">
-                        <td className="py-3 px-4 text-slate-400 text-xs whitespace-nowrap">{fmtDate(log.created_at)}</td>
-                        <td className="py-3 px-4 text-white font-medium text-sm">{log.username}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${ACTION_COLORS[log.action] || 'bg-slate-700 text-slate-300'}`}>
-                            {log.action}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-300 text-sm capitalize">{log.module}</td>
-                        <td className="min-w-[320px] py-3 px-4 text-slate-300 text-sm whitespace-normal break-words">{log.description || '—'}</td>
-                        <td className="py-3 px-4 text-slate-500 text-xs">{log.ip_address || '—'}</td>
-                      </tr>
-                    ))}
+                      <tr><td colSpan="7" className="py-12 text-center text-slate-400">No activity found</td></tr>
+                    ) : logs.map(log => {
+                      const changes = auditChanges(log);
+                      const open = expandedLog === log.id;
+                      return (
+                        <Fragment key={log.id}>
+                          <tr className="hover:bg-slate-750 transition-colors">
+                            <td className="py-3 px-4 text-slate-400 text-xs whitespace-nowrap">{fmtDate(log.created_at)}</td>
+                            <td className="py-3 px-4 text-white font-medium text-sm">{log.username}</td>
+                            <td className="py-3 px-4">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${ACTION_COLORS[log.action] || 'bg-slate-700 text-slate-300'}`}>
+                                {log.action}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-300 text-sm capitalize">{log.module}</td>
+                            <td className="min-w-[300px] py-3 px-4 text-slate-300 text-sm whitespace-normal break-words">{log.description || '—'}</td>
+                            <td className="py-3 px-4 text-sm whitespace-nowrap">
+                              {changes.length ? (
+                                <button type="button" onClick={() => setExpandedLog(open ? null : log.id)}
+                                  className="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-1.5 font-medium text-indigo-300 hover:bg-indigo-500/20">
+                                  {open ? 'Hide details' : `View ${changes.length} change${changes.length === 1 ? '' : 's'}`}
+                                </button>
+                              ) : <span className="text-slate-500">—</span>}
+                            </td>
+                            <td className="py-3 px-4 text-slate-500 text-xs">{log.ip_address || '—'}</td>
+                          </tr>
+                          {open && (
+                            <tr className="bg-slate-900/60">
+                              <td colSpan="7" className="px-5 py-4">
+                                <div className="overflow-hidden rounded-xl border border-slate-700">
+                                  <div className="grid grid-cols-[minmax(140px,0.7fr)_1fr_1fr] bg-slate-900 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    <span>Field</span><span>Before</span><span>After</span>
+                                  </div>
+                                  {changes.map(change => (
+                                    <div key={change.key} className="grid grid-cols-[minmax(140px,0.7fr)_1fr_1fr] gap-3 border-t border-slate-700 px-4 py-3 text-sm">
+                                      <span className="font-medium capitalize text-slate-300">{change.key.replaceAll('_', ' ')}</span>
+                                      <span className="break-all text-rose-300">{auditDisplay(change.before)}</span>
+                                      <span className="break-all text-emerald-300">{auditDisplay(change.after)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -407,13 +468,13 @@ export default function Admin() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Type</label>
-                  <select value={movType} onChange={e => setMovType(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm">
-                    <option value="">All Types</option>
-                    <option value="IN">IN (Procurement)</option>
-                    <option value="OUT">OUT (Distribution)</option>
-                    <option value="ALLOC">ALLOC (Allocation)</option>
-                  </select>
+                  <SearchableSelect value={movType} onChange={setMovType}
+                    placeholder="All Types" searchPlaceholder="Search movement types..."
+                    options={[
+                      { value: 'IN', label: 'IN (Procurement)' },
+                      { value: 'OUT', label: 'OUT (Distribution)' },
+                      { value: 'ALLOC', label: 'ALLOC (Allocation)' },
+                    ]} />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">From Date</label>
@@ -499,7 +560,7 @@ export default function Admin() {
               <table className="app-table-compact w-full">
                 <thead>
                   <tr className="bg-slate-900 text-slate-400 text-xs uppercase">
-                    {['ID','Username','Role','Created','Actions'].map(h => (
+                    {['ID','Username','Role','Cloud login','Created','Actions'].map(h => (
                       <th key={h} className="py-4 px-6 text-left font-semibold">{h}</th>
                     ))}
                   </tr>
@@ -516,6 +577,11 @@ export default function Admin() {
                             : 'bg-blue-100 text-blue-700'
                         }`}>
                           {u.role}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${u.cloud_ready ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {u.cloud_ready ? 'Ready' : 'Needs password reset'}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-slate-400 text-sm">{fmtDate(u.created_at)}</td>
@@ -549,11 +615,9 @@ export default function Admin() {
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
                   <label className="block text-slate-300 text-sm font-medium mb-2">Select User</label>
-                  <select value={reportUser} onChange={e => setReportUser(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 text-white rounded-lg focus:ring-2 focus:ring-indigo-500">
-                    <option value="">Select a user...</option>
-                    {users.map(u => <option key={u.id} value={u.id}>{u.username} ({u.role})</option>)}
-                  </select>
+                  <SearchableSelect value={reportUser} onChange={setReportUser}
+                    placeholder="Select a user..." searchPlaceholder="Search users..."
+                    options={users.map(account => ({ value: account.id, label: `${account.username} (${account.role})` }))} />
                 </div>
                 <button onClick={loadUserReport} disabled={!reportUser || reportLoading}
                   className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
@@ -643,10 +707,10 @@ export default function Admin() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Role *</label>
-            <select value={userForm.role} onChange={e => setUserForm(f => ({ ...f, role: e.target.value }))}
-              className={inputCls}>
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <SearchableSelect value={userForm.role} allowEmpty={false}
+              onChange={value => setUserForm(f => ({ ...f, role: value }))}
+              placeholder="Select role" searchPlaceholder="Search roles..."
+              options={ROLES.map(role => ({ value: role, label: role }))} />
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button type="button" onClick={() => setShowAddUser(false)}
@@ -679,10 +743,10 @@ export default function Admin() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Role</label>
-            <select value={userForm.role} onChange={e => setUserForm(f => ({ ...f, role: e.target.value }))}
-              className={inputCls}>
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <SearchableSelect value={userForm.role} allowEmpty={false}
+              onChange={value => setUserForm(f => ({ ...f, role: value }))}
+              placeholder="Select role" searchPlaceholder="Search roles..."
+              options={ROLES.map(role => ({ value: role, label: role }))} />
           </div>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
             <button type="button" onClick={() => setEditUser(null)}

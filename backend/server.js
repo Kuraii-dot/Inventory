@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import pool from './db/pool.js';
 
 import authRoutes from './routes/auth.js';
 import dashboardRoutes from './routes/dashboard.js';
@@ -15,6 +16,8 @@ import combinationRoutes from './routes/combinations.js';
 import ledgerRoutes from './routes/ledger.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
+import integrationRoutes from './routes/integrations.js';
+import inspectionRequestRoutes from './routes/inspectionRequests.js';
 
 dotenv.config();
 
@@ -57,8 +60,17 @@ app.use('/api/combinations', combinationRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/integrations', integrationRoutes);
+app.use('/api/inspection-requests', inspectionRequestRoutes);
 
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+app.get('/api/health', async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', database: 'connected' });
+  } catch (_error) {
+    res.status(503).json({ status: 'error', database: 'unavailable' });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 

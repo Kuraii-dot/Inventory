@@ -12,6 +12,10 @@ import CategoryModal                    from '../components/items/CategoryModal.
 import SupplierModal                    from '../components/items/SupplierModal.jsx';
 import ClassificationModal              from '../components/items/ClassificationModal.jsx';
 import AppIcon                          from '../components/AppIcon.jsx';
+import { InlineSkeleton, TableSkeletonRows } from '../components/LoadingSkeletons.jsx';
+import SearchableSelect from '../components/SearchableSelect.jsx';
+import usePersistentState from '../hooks/usePersistentState.js';
+import { isLowStock, stockTextClass } from '../utils/stock.js';
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -20,6 +24,10 @@ function fmt(dateStr) {
 
 const MONTHS = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
 function buildYears() { const y = new Date().getFullYear(); return Array.from({ length: 6 }, (_, i) => y - i); }
+const EMPTY_ITEM_FILTERS = {
+  search: '', category_id: '', classification_id: '',
+  filter_month: '', filter_year: '', date_from: '', date_to: '',
+};
 
 export default function Items() {
   const { user, hasRole } = useAuth();
@@ -36,15 +44,12 @@ export default function Items() {
   const [totalPages,      setTotalPages]      = useState(1);
   const [totalRecords,    setTotalRecords]    = useState(0);
 
-  const [filters, setFilters] = useState({
-    search: '', category_id: '', classification_id: '',
-    filter_month: '', filter_year: '', date_from: '', date_to: '',
-  });
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  const [filters, setFilters] = usePersistentState('inventory.filters.items.draft', EMPTY_ITEM_FILTERS);
+  const [appliedFilters, setAppliedFilters] = usePersistentState('inventory.filters.items.applied', EMPTY_ITEM_FILTERS);
 
-  const [showFilters,  setShowFilters]  = useState(false);
-  const [sortField,    setSortField]    = useState('date_procured');
-  const [sortDir,      setSortDir]      = useState('desc');
+  const [showFilters,  setShowFilters]  = usePersistentState('inventory.filters.items.open', false);
+  const [sortField,    setSortField]    = usePersistentState('inventory.filters.items.sortField', 'date_procured');
+  const [sortDir,      setSortDir]      = usePersistentState('inventory.filters.items.sortDir', 'desc');
   const [showAddItem,             setShowAddItem]             = useState(false);
   const [editItemId,              setEditItemId]              = useState(null);
   const [showCategoryModal,       setShowCategoryModal]       = useState(false);
@@ -85,9 +90,18 @@ export default function Items() {
 
   useEffect(() => { loadItems(appliedFilters, 1, sortField, sortDir); loadDropdowns(); loadDeactivated(); }, []);
 
+  useEffect(() => {
+    if (!filters.category_id) { setClsOptions([]); return; }
+    fetchClassifications(filters.category_id).then(setClsOptions).catch(console.error);
+  }, []);
+
   // ── Filters ───────────────────────────────────────────────
   async function handleFilterChange(e) {
     const { name, value } = e.target;
+    return handleFilterValue(name, value);
+  }
+
+  async function handleFilterValue(name, value) {
     setFilters(f => ({ ...f, [name]: value }));
     if (name === 'category_id') {
       if (value) { const cls = await fetchClassifications(value); setClsOptions(cls); }
@@ -103,7 +117,7 @@ export default function Items() {
   }
 
   function handleReset() {
-    const empty = { search: '', category_id: '', classification_id: '', filter_month: '', filter_year: '', date_from: '', date_to: '' };
+    const empty = { ...EMPTY_ITEM_FILTERS };
     setFilters(empty);
     setAppliedFilters(empty);
     setSortField('date_procured');
@@ -117,7 +131,7 @@ export default function Items() {
       showToast('Only Master Admin can deactivate items.', 'error');
       return;
     }
-    if (!confirm(`Deactivate "${name}"? All historical data will be preserved.`)) return;
+    if (!confirm(`WARNING: Deactivate "${name}" (Item #${id})?\n\nThe item will no longer be selectable for new transactions. Historical records will be preserved.`)) return;
     try {
       const result = await deleteItem(id);
       showToast(result.message, 'success');
@@ -142,7 +156,8 @@ export default function Items() {
 
 
 
-  const lowStockCount = items.filter(i => i.quantity < 10).length;
+  const lowStockCount = items.filter(i => isLowStock(i.quantity)).length;
+  const firstLoad = loading && items.length === 0;
   const hasFilters    = Object.values(appliedFilters).some(Boolean);
   const selectCls     = "w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition";
 
@@ -257,35 +272,35 @@ export default function Items() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-2">Category</label>
-                  <select name="category_id" value={filters.category_id} onChange={handleFilterChange} className={selectCls}>
-                    <option value="">All Categories</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <SearchableSelect name="category_id" value={filters.category_id}
+                    onChange={value => handleFilterValue('category_id', value)}
+                    placeholder="All Categories" searchPlaceholder="Search categories..."
+                    options={categories.map(c => ({ value: c.id, label: c.name }))} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-2">Classification</label>
-                  <select name="classification_id" value={filters.classification_id} onChange={handleFilterChange}
+                  <SearchableSelect name="classification_id" value={filters.classification_id}
+                    onChange={value => handleFilterValue('classification_id', value)}
                     disabled={clsOptions.length === 0}
-                    className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-                    <option value="">{clsOptions.length === 0 ? 'Select category first' : 'All Classifications'}</option>
-                    {clsOptions.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
-                  </select>
+                    placeholder={clsOptions.length === 0 ? 'Select category first' : 'All Classifications'}
+                    searchPlaceholder="Search classifications..."
+                    options={clsOptions.map(c => ({ value: c.id, label: c.classification_name }))} />
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-2">Month</label>
-                  <select name="filter_month" value={filters.filter_month} onChange={handleFilterChange} className={selectCls}>
-                    <option value="">All Months</option>
-                    {MONTHS.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-                  </select>
+                  <SearchableSelect name="filter_month" value={filters.filter_month}
+                    onChange={value => handleFilterValue('filter_month', value)}
+                    placeholder="All Months" searchPlaceholder="Search months..."
+                    options={MONTHS.slice(1).map((month, index) => ({ value: index + 1, label: month }))} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-2">Year</label>
-                  <select name="filter_year" value={filters.filter_year} onChange={handleFilterChange} className={selectCls}>
-                    <option value="">All Years</option>
-                    {buildYears().map(y => <option key={y} value={y}>{y}</option>)}
-                  </select>
+                  <SearchableSelect name="filter_year" value={filters.filter_year}
+                    onChange={value => handleFilterValue('filter_year', value)}
+                    placeholder="All Years" searchPlaceholder="Search years..."
+                    options={buildYears().map(year => ({ value: year, label: year }))} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-2">Date From</label>
@@ -319,7 +334,7 @@ export default function Items() {
         {/* Record count */}
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm text-slate-500">
-            {loading ? 'Loading...' : `${totalRecords} item${totalRecords !== 1 ? 's' : ''} found`}
+            {firstLoad ? <InlineSkeleton /> : loading ? `Refreshing ${totalRecords} items…` : `${totalRecords} item${totalRecords !== 1 ? 's' : ''} found`}
           </span>
         </div>
 
@@ -334,9 +349,9 @@ export default function Items() {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr><td colSpan="10" className="py-16 text-center text-slate-400 animate-pulse">Loading...</td></tr>
+              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${loading && !firstLoad ? 'opacity-60' : ''}`} aria-busy={loading}>
+                {firstLoad ? (
+                  <TableSkeletonRows columns={10} rows={8} />
                 ) : items.length === 0 ? (
                   <tr>
                     <td colSpan="10" className="py-16 text-center">
@@ -349,7 +364,7 @@ export default function Items() {
                   </tr>
                 ) : items.map(item => (
                   <tr key={item.id}
-                    className={`hover:bg-blue-50/30 transition-colors duration-150 ${item.quantity < 10 ? 'bg-red-50/50' : ''}`}>
+                    className={`hover:bg-blue-50/30 transition-colors duration-150 ${isLowStock(item.quantity) ? 'bg-red-50/50' : ''}`}>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-blue-300 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -371,10 +386,10 @@ export default function Items() {
                     <td className="py-4 px-4 text-slate-700 whitespace-nowrap">{item.supplier ?? 'N/A'}</td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
-                        <span className={`font-bold ${item.quantity < 10 ? 'text-red-600' : 'text-slate-800'}`}>
+                        <span className={`font-bold ${stockTextClass(item.quantity)}`}>
                           {item.quantity}
                         </span>
-                        {item.quantity < 10 && (
+                        {isLowStock(item.quantity) && (
                           <span className="px-2 py-0.5 bg-red-50 text-red-700 text-xs font-medium rounded-full">Low</span>
                         )}
                       </div>
@@ -466,7 +481,7 @@ export default function Items() {
                         <tr key={item.id} className="opacity-60 hover:opacity-80 transition-opacity">
                           <td className="py-3 px-4 text-sm line-through text-slate-500">{item.name}</td>
                           <td className="py-3 px-4 text-sm text-slate-500">{item.category ?? '—'}</td>
-                          <td className="py-3 px-4 text-sm text-slate-500">{item.quantity}</td>
+                          <td className={`py-3 px-4 text-sm font-bold ${stockTextClass(item.quantity)}`}>{item.quantity}</td>
                           <td className="py-3 px-4 text-sm text-slate-500">{item.unit || 'Pcs'}</td>
                           <td className="py-3 px-4 text-sm text-slate-500">₱{parseFloat(item.unit_price ?? 0).toFixed(2)}</td>
                           <td className="py-3 px-4">

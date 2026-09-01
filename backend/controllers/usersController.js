@@ -6,9 +6,23 @@ import pool   from '../db/pool.js';
 // GET /api/users
 export async function getUsers(req, res) {
   try {
-    const result = await pool.query(
-      `SELECT id, username, role, created_at FROM users ORDER BY id ASC`
-    );
+    let result;
+    try {
+      result = await pool.query(
+        `SELECT id, username, role, created_at,
+                (auth_user_id IS NOT NULL) AS cloud_ready
+         FROM users
+         WHERE role <> 'integration'
+         ORDER BY id ASC`
+      );
+    } catch (error) {
+      // Preserve the LAN rollback build until the cloud migration is applied.
+      if (error.code !== '42703') throw error;
+      result = await pool.query(
+        `SELECT id, username, role, created_at, false AS cloud_ready
+         FROM users ORDER BY id ASC`
+      );
+    }
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ message: err.message });

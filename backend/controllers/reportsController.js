@@ -1121,6 +1121,207 @@ export async function inventoryPreview(req, res) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// TCMS INSPECTION REQUESTS REPORT
+// POST /api/reports/inspections
+// Audits inspector requests, warehouse preparation, destinations,
+// released quantities, and the linked distribution value.
+// ══════════════════════════════════════════════════════════════
+export async function inspectionRequestsReport(req, res) {
+  const {
+    format = 'pdf', timeframe = 'today', from, to, status = 'all',
+  } = req.body || {};
+  const allowedStatuses = new Set(['new', 'preparing', 'ready', 'released', 'cancelled']);
+
+  try {
+    const { start, end } = getDateRange(timeframe, from, to);
+    const params = [`${start} 00:00:00`, `${end} 23:59:59`];
+    let statusClause = '';
+    if (status !== 'all') {
+      if (!allowedStatuses.has(status)) throw new Error('Invalid inspection request status.');
+      params.push(status);
+      statusClause = `AND r.status = $${params.length}`;
+    }
+
+    const result = await pool.query(`
+      SELECT
+        r.id,
+        COALESCE(r.source_submitted_at, r.created_at) AS submitted_at,
+        r.application_no,
+        r.applicant_name,
+        r.address,
+        r.barangay,
+        r.inspector_name,
+        r.date_inspected,
+        r.recommendation,
+        r.status,
+        r.released_at,
+        released_user.username AS released_by,
+        requested.materials AS requested_materials,
+        requested.total_quantity AS requested_quantity,
+        prepared.materials AS prepared_materials,
+        prepared.total_quantity AS prepared_quantity,
+        released.materials AS released_materials,
+        released.destinations,
+        released.total_quantity AS released_quantity,
+        released.total_value
+      FROM inspection_requests r
+      LEFT JOIN users released_user ON released_user.id = r.released_by_user_id
+      LEFT JOIN LATERAL (
+        SELECT
+          string_agg(
+            concat(COALESCE(ri.inspector_description, 'Material'), ' x ', ri.inspector_quantity),
+            E'\n' ORDER BY COALESCE(ri.inspector_description, 'Material')
+          ) AS materials,
+          COALESCE(SUM(ri.inspector_quantity), 0)::integer AS total_quantity
+        FROM inspection_request_items ri
+        WHERE ri.request_id = r.id
+          AND ri.source_active = true
+          AND ri.inspector_quantity > 0
+      ) requested ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          string_agg(
+            concat(COALESCE(ri.prepared_description, i.name, 'Material'), ' x ', ri.prepared_quantity),
+            E'\n' ORDER BY COALESCE(ri.prepared_description, i.name, 'Material')
+          ) AS materials,
+          COALESCE(SUM(ri.prepared_quantity), 0)::integer AS total_quantity
+        FROM inspection_request_items ri
+        LEFT JOIN items i ON i.id = ri.prepared_item_id
+        WHERE ri.request_id = r.id
+          AND ri.prepared_quantity > 0
+      ) prepared ON true
+      LEFT JOIN LATERAL (
+        SELECT
+          string_agg(
+            concat(COALESCE(i.name, 'Material'), ' x ', d.quantity),
+            E'\n' ORDER BY COALESCE(i.name, 'Material')
+          ) AS materials,
+          string_agg(DISTINCT COALESCE(NULLIF(d.department, ''), 'Unspecified'), ', ') AS destinations,
+          COALESCE(SUM(d.quantity), 0)::integer AS total_quantity,
+          COALESCE(SUM(d.total_value), 0)::numeric AS total_value
+        FROM distributions d
+        LEFT JOIN items i ON i.id = d.item_id
+        WHERE d.inspection_request_id = r.id
+      ) released ON true
+      WHERE COALESCE(r.source_submitted_at, r.created_at) BETWEEN $1 AND $2
+        ${statusClause}
+      ORDER BY COALESCE(r.source_submitted_at, r.created_at) ASC, r.application_no ASC`,
+      params
+    );
+
+    const rows = result.rows;
+    const releasedCount = rows.filter(row => row.status === 'released').length;
+    const totalValue = rows.reduce((sum, row) => sum + Number(row.total_value || 0), 0);
+    const subtitle = `Period: ${fmtDate(start)} - ${fmtDate(end)}  |  ${rows.length} request${rows.length === 1 ? '' : 's'}  |  ${releasedCount} released`;
+
+    if (format === 'pdf') {
+      const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 40, bufferPages: true });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="inspection_requests_report_${Date.now()}.pdf"`);
+      doc.pipe(res);
+
+      drawPageFrame(doc);
+      let y = drawReportHeader(doc, 'TCMS INSPECTION MATERIALS REPORT', subtitle, COLORS.accent2);
+      const cols = [
+        { label: 'Submitted', width: 65 },
+        { label: 'Application', width: 58 },
+        { label: 'Applicant', width: 82 },
+        { label: 'Barangay', width: 62 },
+        { label: 'Inspector', width: 65 },
+        { label: 'Status', width: 46 },
+        { label: 'Requested', width: 105 },
+        { label: 'Prepared / Released', width: 115 },
+        { label: 'Destination', width: 65 },
+        { label: 'Value', width: 58, align: 'right' },
+      ];
+      y = drawTableHeader(doc, cols, y + 8, COLORS.accent2);
+
+      rows.forEach((row, index) => {
+        const fulfilledMaterials = row.status === 'released'
+          ? row.released_materials
+          : row.prepared_materials;
+        y = drawTableRow(doc, cols, [
+          fmtDate(row.submitted_at),
+          row.application_no,
+          row.applicant_name,
+          row.barangay || '-',
+          row.inspector_name || '-',
+          row.status,
+          row.requested_materials || 'None',
+          fulfilledMaterials || 'None',
+          row.destinations || (row.status === 'released' ? 'Unspecified' : 'Pending'),
+          fmtCurrency(row.total_value),
+        ], y, index % 2 === 1, doc.page.height, COLORS.accent2);
+      });
+
+      y = drawTotalRow(doc, cols, 'TOTAL RELEASED VALUE', fmtCurrency(totalValue), y + 4, COLORS.accent2);
+      const pages = doc.bufferedPageRange();
+      for (let page = 0; page < pages.count; page++) {
+        doc.switchToPage(page);
+        drawFooter(doc, page + 1, pages.count);
+      }
+      doc.end();
+      return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'CCWD Inventory System';
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet('Inspection Materials');
+    const columns = [
+      { header: 'Submitted', key: 'submitted', width: 20 },
+      { header: 'Application No.', key: 'application', width: 18 },
+      { header: 'Applicant', key: 'applicant', width: 28 },
+      { header: 'Address', key: 'address', width: 34 },
+      { header: 'Barangay', key: 'barangay', width: 20 },
+      { header: 'Inspector', key: 'inspector', width: 22 },
+      { header: 'Recommendation', key: 'recommendation', width: 18 },
+      { header: 'Status', key: 'status', width: 14 },
+      { header: 'Requested Materials', key: 'requested', width: 42 },
+      { header: 'Prepared Materials', key: 'prepared', width: 42 },
+      { header: 'Released Materials', key: 'released', width: 42 },
+      { header: 'Destination', key: 'destination', width: 20 },
+      { header: 'Released By / Date', key: 'releasedBy', width: 25 },
+      { header: 'Released Value', key: 'value', width: 18 },
+    ];
+    sheet.columns = columns.map(({ key, width }) => ({ key, width }));
+    addExcelTitleBlock(sheet, 'TCMS INSPECTION MATERIALS REPORT', subtitle, columns.length);
+    const headerRow = sheet.addRow(columns.map(column => column.header));
+    styleExcelHeader(sheet, headerRow, columns);
+
+    rows.forEach((row, index) => {
+      const excelRow = sheet.addRow([
+        fmtDateTime(row.submitted_at),
+        row.application_no,
+        row.applicant_name,
+        row.address || '',
+        row.barangay || '',
+        row.inspector_name || '',
+        row.recommendation || '',
+        row.status,
+        row.requested_materials || 'None',
+        row.prepared_materials || 'None',
+        row.released_materials || 'None',
+        row.destinations || '',
+        row.released_at ? `${row.released_by || 'Inventory'} / ${fmtDateTime(row.released_at)}` : '',
+        Number(row.total_value || 0),
+      ]);
+      excelRow.getCell(columns.length).numFmt = '"PHP" #,##0.00';
+      styleExcelRow(excelRow, index % 2 === 1);
+    });
+    addExcelTotalRow(sheet, columns.length, 'TOTAL RELEASED VALUE', totalValue);
+    sheet.getCell(sheet.rowCount, columns.length).numFmt = '"PHP" #,##0.00';
+    finalizeExcelSheet(sheet, headerRow.number, columns.length);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="inspection_requests_report_${Date.now()}.xlsx"`);
+    await workbook.xlsx.write(res);
+  } catch (err) {
+    res.status(500).json({ message: 'Inspection report error: ' + err.message });
+  }
+}
+
 function finalizeExcelSheet(sheet, headerRowNumber, colCount, enableFilter = true) {
   sheet.views = [{ state: 'frozen', ySplit: headerRowNumber, showGridLines: false }];
   if (enableFilter) {

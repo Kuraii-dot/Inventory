@@ -126,7 +126,7 @@ export async function addDistribution(req, res) {
     let items_distributed = 0;
 
     for (const itemData of items) {
-      const { category_id, item_id, quantity: qty } = itemData;
+      const { item_id, quantity: qty } = itemData;
       const quantity_requested = parseInt(qty);
 
       if (quantity_requested <= 0) {
@@ -134,18 +134,35 @@ export async function addDistribution(req, res) {
         return res.json({ status: 'error', message: 'Invalid quantity for one of the items.' });
       }
 
-      // Get item name
-      const itemRes = await client.query('SELECT name FROM items WHERE id = $1', [item_id]);
-      const itemName = itemRes.rows[0]?.name;
-      if (!itemName) {
+      // Resolve the logical material selected by the user. FIFO may consume a
+      // different physical inventory row, so the real batch id must be stored
+      // on each distribution record (not merely the id selected in the form).
+      const itemRes = await client.query(
+        `SELECT id, name, category_id, classification_id, unit
+         FROM items WHERE id = $1 AND is_active = true`,
+        [item_id]
+      );
+      const selectedItem = itemRes.rows[0];
+      if (!selectedItem) {
         await client.query('ROLLBACK');
         return res.json({ status: 'error', message: `Item ID ${item_id} not found.` });
       }
+      const itemName = selectedItem.name;
 
-      // FIFO batches — mirrors: ORDER BY date_procured ASC, id ASC
+      // FIFO pool is limited to the same material identity. Matching only by
+      // name can mix unrelated categories/classifications that share a label.
       const batchRes = await client.query(
-        'SELECT id, quantity, unit_price, date_procured FROM items WHERE name = $1 AND quantity > 0 ORDER BY date_procured ASC, id ASC',
-        [itemName]
+        `SELECT id, category_id, quantity, unit_price, date_procured
+         FROM items
+         WHERE name = $1
+           AND category_id = $2
+           AND classification_id IS NOT DISTINCT FROM $3
+           AND unit = $4
+           AND is_active = true
+           AND quantity > 0
+         ORDER BY date_procured ASC, id ASC
+         FOR UPDATE`,
+        [itemName, selectedItem.category_id, selectedItem.classification_id, selectedItem.unit]
       );
 
       let remaining   = quantity_requested;
@@ -159,6 +176,14 @@ export async function addDistribution(req, res) {
         item_value  += deduct * parseFloat(batch.unit_price);
 
         await client.query('UPDATE items SET quantity = quantity - $1 WHERE id = $2', [deduct, batch.id]);
+        await client.query(
+          `INSERT INTO distributions
+             (item_id, category_id, recipient, department, debit_to, approved_by, quantity,
+              purpose, date, time, total_value, distributed_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [batch.id, batch.category_id, recipient, department, debit_to || null, approved_by,
+           deduct, purpose, dist_date, dist_time, deduct * parseFloat(batch.unit_price), distributed_at]
+        );
         batch_log.push({ batch_id: batch.id, deducted: deduct, date_procured: batch.date_procured });
       }
 
@@ -166,16 +191,6 @@ export async function addDistribution(req, res) {
         await client.query('ROLLBACK');
         return res.json({ status: 'error', message: `Not enough stock available for ${itemName}.` });
       }
-
-      // Insert distribution record
-      await client.query(
-        `INSERT INTO distributions
-           (item_id, category_id, recipient, department, debit_to, approved_by, quantity,
-            purpose, date, time, total_value, distributed_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [item_id, category_id, recipient, department, debit_to || null, approved_by,
-         quantity_requested, purpose, dist_date, dist_time, item_value, distributed_at]
-      );
 
       total_distributed_value += item_value;
       all_logs.push({ item: itemName, quantity: quantity_requested, value: item_value, batches: batch_log });
@@ -207,7 +222,14 @@ export async function updateDistribution(req, res) {
   const { id } = req.params;
   const { recipient, department, approved_by, debit_to = '', purpose, quantity, item_id } = req.body;
 
-  if (!recipient || !department || !quantity || !item_id) {
+  const distributionId = Number(id);
+  const requestedItemId = Number(item_id);
+  const requestedQuantity = Number(quantity);
+
+  if (!recipient || !department || !approved_by || !purpose
+      || !Number.isSafeInteger(distributionId) || distributionId <= 0
+      || !Number.isSafeInteger(requestedItemId) || requestedItemId <= 0
+      || !Number.isSafeInteger(requestedQuantity) || requestedQuantity <= 0) {
     return res.status(400).json({ status: 'error', message: 'Missing required fields.' });
   }
 
@@ -216,29 +238,63 @@ export async function updateDistribution(req, res) {
     await client.query('BEGIN');
 
     // Get old distribution
-    const oldRes = await client.query('SELECT item_id, quantity FROM distributions WHERE id = $1', [id]);
+    const oldRes = await client.query(
+      `SELECT d.item_id, d.category_id, d.quantity, d.total_value
+       FROM distributions d
+       WHERE d.id = $1
+       FOR UPDATE`,
+      [distributionId]
+    );
     const old = oldRes.rows[0];
     if (!old) {
       await client.query('ROLLBACK');
       return res.json({ status: 'error', message: 'Distribution not found.' });
     }
 
-    // Restore old stock
-    await client.query('UPDATE items SET quantity = quantity + $1 WHERE id = $2', [old.quantity, old.item_id]);
+    const oldQuantity = Number(old.quantity);
 
-    // Check new stock
-    const stockRes = await client.query('SELECT quantity FROM items WHERE id = $1 FOR UPDATE', [item_id]);
-    if (!stockRes.rows[0]) throw new Error('Item not found.');
-    if (stockRes.rows[0].quantity < parseInt(quantity)) throw new Error('Not enough stock available.');
+    // A distribution row now represents one exact FIFO inventory batch. Restore
+    // that row first, then re-deduct only from the exact item id being edited.
+    // This prevents duplicate names from silently moving stock between item ids.
+    await client.query(
+      'UPDATE items SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2',
+      [oldQuantity, old.item_id]
+    );
 
-    // Deduct new stock
-    await client.query('UPDATE items SET quantity = quantity - $1 WHERE id = $2', [quantity, item_id]);
+    const selectedItem = await client.query(
+      `SELECT id, category_id, quantity, unit_price, is_active
+       FROM items
+       WHERE id = $1
+       FOR UPDATE`,
+      [requestedItemId]
+    );
+    const selected = selectedItem.rows[0];
+    if (!selected || (!selected.is_active && requestedItemId !== Number(old.item_id))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ status: 'error', message: 'The selected item is unavailable.' });
+    }
+    if (Number(selected.quantity) < requestedQuantity) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        status: 'error',
+        message: `Not enough stock in Item #${requestedItemId}. Available: ${selected.quantity}.`,
+      });
+    }
+
+    await client.query(
+      'UPDATE items SET quantity = quantity - $1, updated_at = NOW() WHERE id = $2',
+      [requestedQuantity, requestedItemId]
+    );
+    const newCategoryId = Number(selected.category_id);
+    const newTotalValue = requestedQuantity * Number(selected.unit_price || 0);
 
     // Update distribution record
     await client.query(
       `UPDATE distributions SET recipient=$1, department=$2, approved_by=$3, debit_to=$4,
-       purpose=$5, quantity=$6, item_id=$7 WHERE id=$8`,
-      [recipient, department, approved_by, debit_to || null, purpose, quantity, item_id, id]
+       purpose=$5, quantity=$6, item_id=$7, category_id=$8, total_value=$9, updated_at=NOW()
+       WHERE id=$10`,
+      [recipient, department, approved_by, debit_to || null, purpose, requestedQuantity,
+       requestedItemId, newCategoryId, newTotalValue, distributionId]
     );
 
     await client.query('COMMIT');
@@ -263,7 +319,7 @@ export async function deleteDistribution(req, res) {
     await client.query('BEGIN');
 
     const distRes = await client.query(
-      'SELECT id, item_id, quantity FROM distributions WHERE id = $1 FOR UPDATE',
+      'SELECT id, item_id, quantity, total_value FROM distributions WHERE id = $1 FOR UPDATE',
       [id]
     );
     const dist = distRes.rows[0];
@@ -307,7 +363,7 @@ export async function returnDistribution(req, res) {
     await client.query('BEGIN');
 
     const distRes = await client.query(
-      'SELECT id, item_id, quantity FROM distributions WHERE id = $1 FOR UPDATE',
+      'SELECT id, item_id, quantity, total_value FROM distributions WHERE id = $1 FOR UPDATE',
       [id]
     );
     const dist = distRes.rows[0];
@@ -328,7 +384,11 @@ export async function returnDistribution(req, res) {
     const newQty = currentQty - returnQty;
     if (newQty > 0) {
       // Partial return — update quantity
-      await client.query('UPDATE distributions SET quantity = $1 WHERE id = $2', [newQty, id]);
+      const unitValue = currentQty > 0 ? Number(dist.total_value || 0) / currentQty : 0;
+      await client.query(
+        'UPDATE distributions SET quantity = $1, total_value = $2, updated_at = NOW() WHERE id = $3',
+        [newQty, unitValue * newQty, id]
+      );
     } else {
       // Full return — delete record (mirrors PHP: DELETE)
       await client.query('DELETE FROM distributions WHERE id = $1', [id]);

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Chart from 'chart.js/auto';
 import { useAuth } from '../context/AuthContext.jsx';
 import { fetchDashboardData } from '../api/dashboard.js';
+import { fetchAllOverview, fetchCategories, fetchItems, fetchSuppliers } from '../api/items.js';
+import { fetchInspectionRequests } from '../api/inspectionRequests.js';
 import AppIcon from '../components/AppIcon.jsx';
 import './Dashboard.css';
 
@@ -60,6 +62,25 @@ export default function Dashboard() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!data) return undefined;
+    const warmCommonScreens = () => {
+      void Promise.allSettled([
+        fetchItems({ page: 1, limit: 15, sort_field: 'date_procured', sort_dir: 'desc' }),
+        fetchAllOverview(),
+        fetchCategories(),
+        fetchSuppliers(),
+        fetchInspectionRequests({ limit: 100 }),
+      ]);
+    };
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(warmCommonScreens, { timeout: 1_500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(warmCommonScreens, 400);
+    return () => window.clearTimeout(id);
+  }, [data]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
@@ -148,7 +169,7 @@ export default function Dashboard() {
 
           <section className="inventory-card inventory-recent-card">
             <div className="inventory-card-head"><div><h2>Recently Added Items</h2><p>Latest additions to inventory</p></div><button type="button" onClick={() => navigate('/allitems')}>View all <AppIcon name="arrowRight" size={13} /></button></div>
-            <div className="inventory-recent-list">{recentItems.length === 0 ? <p className="inventory-empty">No recent items available.</p> : recentItems.map((item, index) => <button type="button" key={`${item.name}-${index}`} onClick={() => navigate('/allitems')}><span className="inventory-recent-icon"><AppIcon name="package" size={15} /></span><span className="inventory-recent-copy"><strong>{item.name}</strong><small>{item.category || 'Uncategorized'}</small></span><span className="inventory-recent-meta"><b className={Number(item.quantity) < 10 ? 'low' : 'good'}>{numberFormat.format(item.quantity)} in stock</b><small>{pesoFormat.format(Number(item.unit_price) || 0)}</small></span></button>)}</div>
+            <div className="inventory-recent-list">{recentItems.length === 0 ? <p className="inventory-empty">No recent items available.</p> : recentItems.map((item, index) => <button type="button" key={`${item.name}-${index}`} onClick={() => navigate('/allitems')}><span className="inventory-recent-icon"><AppIcon name="package" size={15} /></span><span className="inventory-recent-copy"><strong>{item.name}</strong><small>{item.category || 'Uncategorized'}</small></span><span className="inventory-recent-meta"><b className={Number(item.quantity) <= 10 ? 'low' : 'good'}>{numberFormat.format(item.quantity)} in stock</b><small>{pesoFormat.format(Number(item.unit_price) || 0)}</small></span></button>)}</div>
           </section>
 
           <section className="inventory-card inventory-quick-card">

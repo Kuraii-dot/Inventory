@@ -121,7 +121,7 @@ export async function addAllocation(req, res) {
     let items_allocated = 0;
 
     for (const itemData of items) {
-      const { category_id, item_id, quantity: qty_requested } = itemData;
+      const { item_id, quantity: qty_requested } = itemData;
       const quantity_requested = parseInt(qty_requested);
 
       if (quantity_requested <= 0) {
@@ -130,17 +130,28 @@ export async function addAllocation(req, res) {
       }
 
       // Fetch item name
-      const itemRes = await client.query('SELECT name, quantity FROM items WHERE id = $1', [item_id]);
+      const itemRes = await client.query(
+        `SELECT id, name, category_id, classification_id, unit
+         FROM items WHERE id = $1 AND is_active = true`,
+        [item_id]
+      );
       const item = itemRes.rows[0];
       if (!item) {
         await client.query('ROLLBACK');
         return res.json({ status: 'error', message: `Item ID ${item_id} not found.` });
       }
 
-      // mirrors: SUM(quantity) across all batches with same name
+      // Sum only true duplicate batches of the same logical material.
       const stockRes = await client.query(
-        'SELECT SUM(quantity) AS total_stock FROM items WHERE name = $1 AND quantity > 0',
-        [item.name]
+        `SELECT SUM(quantity) AS total_stock
+         FROM items
+         WHERE name = $1
+           AND category_id = $2
+           AND classification_id IS NOT DISTINCT FROM $3
+           AND unit = $4
+           AND is_active = true
+           AND quantity > 0`,
+        [item.name, item.category_id, item.classification_id, item.unit]
       );
       const totalStock = parseInt(stockRes.rows[0].total_stock ?? 0);
 
@@ -149,10 +160,19 @@ export async function addAllocation(req, res) {
         return res.json({ status: 'error', message: `Not enough stock for ${item.name}. Available: ${totalStock}` });
       }
 
-      // FIFO: fetch batches ordered by oldest first
+      // FIFO: lock and consume the oldest exact inventory rows first.
       const batchRes = await client.query(
-        'SELECT id, quantity FROM items WHERE name = $1 AND quantity > 0 ORDER BY date_procured ASC, id ASC',
-        [item.name]
+        `SELECT id, category_id, quantity
+         FROM items
+         WHERE name = $1
+           AND category_id = $2
+           AND classification_id IS NOT DISTINCT FROM $3
+           AND unit = $4
+           AND is_active = true
+           AND quantity > 0
+         ORDER BY date_procured ASC, id ASC
+         FOR UPDATE`,
+        [item.name, item.category_id, item.classification_id, item.unit]
       );
 
       let remaining = quantity_requested;
@@ -161,14 +181,20 @@ export async function addAllocation(req, res) {
         const deduct = Math.min(remaining, batch.quantity);
         remaining -= deduct;
         await client.query('UPDATE items SET quantity = quantity - $1 WHERE id = $2', [deduct, batch.id]);
+        await client.query(
+          `INSERT INTO allocations
+             (item_id, category_id, department, allocated_by, quantity, purpose, remarks, allocated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [batch.id, batch.category_id, department, allocated_by, deduct, purpose, remarks]
+        );
       }
-
-      // Insert allocation record
-      await client.query(
-        `INSERT INTO allocations (item_id, category_id, department, allocated_by, quantity, purpose, remarks, allocated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-        [item_id, category_id, department, allocated_by, quantity_requested, purpose, remarks]
-      );
+      if (remaining > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          status: 'error',
+          message: `Stock changed while allocating ${item.name}. Please refresh and try again.`,
+        });
+      }
 
       total_quantity += quantity_requested;
       items_allocated++;
@@ -208,7 +234,7 @@ export async function updateAllocation(req, res) {
 
     // Get current allocation
     const currentRes = await client.query(
-      `SELECT item_id, quantity FROM allocations WHERE id = $1 AND status = 'active'`,
+      `SELECT item_id, quantity FROM allocations WHERE id = $1 AND status = 'active' FOR UPDATE`,
       [id]
     );
     const current = currentRes.rows[0];
@@ -222,29 +248,45 @@ export async function updateAllocation(req, res) {
     const newItemId  = parseInt(item_id);
     const newQty     = parseInt(quantity);
 
-    if (oldItemId !== newItemId) {
-      // Item changed — restore old, check + deduct new
-      await client.query('UPDATE items SET quantity = quantity + $1 WHERE id = $2', [oldQty, oldItemId]);
-
-      const stockRes = await client.query('SELECT quantity FROM items WHERE id = $1', [newItemId]);
-      if (!stockRes.rows[0]) throw new Error('Selected item not found.');
-      if (stockRes.rows[0].quantity < newQty) throw new Error(`Insufficient stock. Available: ${stockRes.rows[0].quantity}`);
-
-      await client.query('UPDATE items SET quantity = quantity - $1 WHERE id = $2', [newQty, newItemId]);
-    } else {
-      // Same item — handle qty diff
-      const diff = newQty - oldQty;
-      if (diff > 0) {
-        const stockRes = await client.query('SELECT quantity FROM items WHERE id = $1', [newItemId]);
-        if (stockRes.rows[0].quantity < diff) throw new Error(`Insufficient stock. Available: ${stockRes.rows[0].quantity}`);
-      }
-      await client.query('UPDATE items SET quantity = quantity - $1 WHERE id = $2', [diff, newItemId]);
+    if (!Number.isSafeInteger(newItemId) || newItemId <= 0
+        || !Number.isSafeInteger(newQty) || newQty <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ status: 'error', message: 'Invalid item or quantity.' });
     }
 
+    // Restore the exact FIFO batch recorded on the allocation, then deduct
+    // only from the exact item id retained/selected by the edit form.
     await client.query(
-      `UPDATE allocations SET item_id=$1, quantity=$2, department=$3, allocated_by=$4, purpose=$5, remarks=$6, updated_at=NOW()
-       WHERE id=$7`,
-      [newItemId, newQty, department, allocated_by, purpose, remarks, id]
+      'UPDATE items SET quantity = quantity + $1, updated_at = NOW() WHERE id = $2',
+      [oldQty, oldItemId]
+    );
+    const stockRes = await client.query(
+      `SELECT id, category_id, quantity, is_active
+       FROM items WHERE id = $1 FOR UPDATE`,
+      [newItemId]
+    );
+    const selected = stockRes.rows[0];
+    if (!selected || (!selected.is_active && newItemId !== oldItemId)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ status: 'error', message: 'Selected item is unavailable.' });
+    }
+    if (Number(selected.quantity) < newQty) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        status: 'error',
+        message: `Insufficient stock in Item #${newItemId}. Available: ${selected.quantity}.`,
+      });
+    }
+    await client.query(
+      'UPDATE items SET quantity = quantity - $1, updated_at = NOW() WHERE id = $2',
+      [newQty, newItemId]
+    );
+
+    await client.query(
+      `UPDATE allocations SET item_id=$1, category_id=$2, quantity=$3, department=$4,
+       allocated_by=$5, purpose=$6, remarks=$7, updated_at=NOW()
+       WHERE id=$8`,
+      [newItemId, selected.category_id, newQty, department, allocated_by, purpose, remarks, id]
     );
 
     await client.query('COMMIT');
@@ -268,7 +310,7 @@ export async function deleteAllocation(req, res) {
   try {
     await client.query('BEGIN');
 
-    const allRes = await client.query('SELECT item_id, quantity, status FROM allocations WHERE id = $1', [id]);
+    const allRes = await client.query('SELECT item_id, quantity, status FROM allocations WHERE id = $1 FOR UPDATE', [id]);
     const allocation = allRes.rows[0];
     if (!allocation) {
       await client.query('ROLLBACK');
@@ -307,7 +349,7 @@ export async function returnAllocation(req, res) {
     await client.query('BEGIN');
 
     const allRes = await client.query(
-      `SELECT item_id, quantity FROM allocations WHERE id = $1 AND status = 'active'`,
+      `SELECT item_id, quantity FROM allocations WHERE id = $1 AND status = 'active' FOR UPDATE`,
       [id]
     );
     const allocation = allRes.rows[0];
@@ -317,8 +359,15 @@ export async function returnAllocation(req, res) {
     }
 
     const allocated_qty = parseInt(allocation.quantity);
-    const return_qty    = parseInt(return_quantity) || allocated_qty; // default full return
+    const parsedReturnQty = return_quantity === '' || return_quantity === null || return_quantity === undefined
+      ? allocated_qty
+      : Number(return_quantity);
+    const return_qty = parsedReturnQty;
 
+    if (!Number.isSafeInteger(return_qty) || return_qty <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ status: 'error', message: 'Return quantity must be a positive whole number.' });
+    }
     if (return_qty > allocated_qty) {
       await client.query('ROLLBACK');
       return res.json({ status: 'error', message: 'Return quantity cannot exceed allocated quantity.' });

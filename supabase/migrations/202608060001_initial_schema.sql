@@ -7,7 +7,9 @@ CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY,
   username VARCHAR(100) UNIQUE NOT NULL,
   password TEXT NOT NULL,
-  role VARCHAR(30) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin', 'master_admin')),
+  role VARCHAR(30) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin', 'master_admin', 'integration')),
+  auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
+  auth_email TEXT UNIQUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

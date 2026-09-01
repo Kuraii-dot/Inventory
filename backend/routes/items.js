@@ -20,6 +20,7 @@ router.get('/',                   getItems);
 router.post('/', logCreate('items', (req, data) => `Added item: ${req.body.name} (qty: ${req.body.quantity})`), addItem);
 router.get('/movement/all',       getItemMovementAll);
 router.get('/:id',                getItemById);
+router.put('/:id/restore', logUpdate('items', (req) => `Restored item ID: ${req.params.id}`), restoreItem);
 router.put('/:id', logUpdate('items', (req) => `Updated item ID: ${req.params.id}`), updateItem);
 router.delete('/:id', logDelete('items', (req) => `Deleted item ID: ${req.params.id}`), deleteItem);
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import AppIcon from './AppIcon.jsx';
@@ -8,6 +8,7 @@ const BASE_LINKS = [
   { to: '/allitems', label: 'All Items', icon: 'boxes' },
   { to: '/allocation', label: 'Allocation', icon: 'layers' },
   { to: '/distributions', label: 'Distributions', icon: 'truck' },
+  { to: '/inspection-requests', label: 'Inspection Requests', icon: 'clipboard' },
   { to: '/items', label: 'Manage Items', icon: 'settings' },
 ];
 
@@ -15,6 +16,17 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const connected = () => setOnline(true);
+    const disconnected = () => setOnline(false);
+    window.addEventListener('online', connected);
+    window.addEventListener('offline', disconnected);
+    return () => {
+      window.removeEventListener('online', connected);
+      window.removeEventListener('offline', disconnected);
+    };
+  }, []);
   if (!user) return null;
   const links = user.role === 'master_admin' ? [...BASE_LINKS, { to: '/admin', label: 'Admin', icon: 'shield' }] : BASE_LINKS;
 
@@ -31,6 +43,10 @@ export default function Navbar() {
         <nav className={`app-nav-links ${open ? 'is-open' : ''}`} aria-label="Primary navigation">
           {links.map((link) => <NavLink key={link.to} to={link.to} onClick={() => setOpen(false)} className={({ isActive }) => `app-nav-link${isActive ? ' active' : ''}`}><AppIcon name={link.icon} size={16} /><span>{link.label}</span></NavLink>)}
         </nav>
+        <span className={`app-cloud-status ${online ? 'is-online' : 'is-offline'}`} role="status" title={online ? 'Connected to the cloud inventory service' : 'Reconnect to use live inventory actions'}>
+          <AppIcon name={online ? 'wifi' : 'wifiOff'} size={14} />
+          <span>{online ? 'Cloud connected' : 'Offline'}</span>
+        </span>
         <div className="app-user-menu">
           <span className="app-user-avatar"><AppIcon name={user.role === 'master_admin' ? 'shield' : 'user'} size={17} /></span>
           <span className="app-user-copy"><strong>{user.username || 'User'}</strong><small>{user.role === 'master_admin' ? 'Master Administrator' : user.role || 'Inventory User'}</small></span>

@@ -151,7 +151,7 @@ export async function getUserReport(req, res) {
 
     // Get their activity logs
     const logsRes = await pool.query(
-      `SELECT action, module, record_id, description, created_at
+      `SELECT action, module, record_id, description, old_data, new_data, created_at
        FROM activity_logs
        WHERE user_id = $1
        ${start_date ? 'AND created_at >= $2' : ''}

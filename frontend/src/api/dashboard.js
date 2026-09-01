@@ -1,5 +1,5 @@
 // frontend/src/api/dashboard.js
-import client from './client.js';
+import { cachedGet } from './cache.js';
 
 // Replaces: all 5 individual PHP $conn->query() calls + foreach loops
-export const fetchDashboardData = () => client.get('/dashboard').then(r => r.data);
+export const fetchDashboardData = (options = {}) => cachedGet('/dashboard', { ttl: 30_000, ...options });

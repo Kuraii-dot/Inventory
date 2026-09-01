@@ -5,7 +5,7 @@ import {
   FolderTree, History, Info, Layers3, LayoutDashboard, ListTree, LogOut,
   Menu, Package, PackageCheck, PackageOpen, Pencil, Plus, RefreshCw, RotateCcw,
   Search, Settings2, ShieldCheck, Sparkles, Sun, Moon, Trash2, Truck,
-  Undo2, Users, Warehouse, X, Zap,
+  Undo2, Users, Warehouse, Wifi, WifiOff, X, Zap,
 } from 'lucide-react';
 
 const icons = {
@@ -19,7 +19,7 @@ const icons = {
   report: FileSpreadsheet, restore: ArchiveRestore, return: Undo2, rotate: RotateCcw,
   search: Search, settings: Settings2, shield: ShieldCheck, sparkles: Sparkles, sun: Sun,
   trash: Trash2, truck: Truck, user: CircleUserRound, users: Users, warehouse: Warehouse,
-  x: X, zap: Zap,
+  wifi: Wifi, wifiOff: WifiOff, x: X, zap: Zap,
 };
 
 export default function AppIcon({ name, size = 16, strokeWidth = 2, className = '', ...props }) {

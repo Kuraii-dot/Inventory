@@ -14,31 +14,17 @@ import pool from '../db/pool.js';
 export async function getDashboardData(req, res) {
   try {
     // Run all queries in parallel — mirrors the 5 individual PHP $conn->query() calls
-    const [
-      totalItemsRes,
-      totalCategoriesRes,
-      totalSuppliersRes,
-      lowStockRes,
-      totalValueRes,
-      lowStockListRes,
-      recentItemsRes,
-      categoryDataRes,
-    ] = await Promise.all([
-      // mirrors: SELECT COUNT(*) FROM items
-      pool.query('SELECT COUNT(*) AS count FROM items'),
-
-      // mirrors: SELECT COUNT(*) FROM categories
-      pool.query('SELECT COUNT(*) AS count FROM categories'),
-
-      // mirrors: SELECT COUNT(*) FROM suppliers
-      pool.query('SELECT COUNT(*) AS count FROM suppliers'),
-
-      // mirrors: SELECT COUNT(*) FROM items WHERE quantity < 5
-      pool.query('SELECT COUNT(*) AS count FROM items WHERE quantity < 10'),
-
-      // mirrors: SELECT COALESCE(SUM(quantity * unit_price), 0) FROM items
-      pool.query('SELECT COALESCE(SUM(quantity * unit_price), 0) AS total FROM items'),
-
+    const [statsRes, lowStockListRes, recentItemsRes, categoryDataRes] = await Promise.all([
+      // Fetch scalar totals in one database round-trip.
+      pool.query(`
+        SELECT
+          COUNT(*) AS total_items,
+          COUNT(*) FILTER (WHERE quantity < 10) AS low_stock_items,
+          COALESCE(SUM(quantity * unit_price), 0) AS total_value,
+          (SELECT COUNT(*) FROM categories) AS total_categories,
+          (SELECT COUNT(*) FROM suppliers) AS total_suppliers
+        FROM items
+      `),
       // mirrors: low stock items list for hover panel
       pool.query(`
         SELECT i.name, i.quantity, c.name AS category
@@ -73,14 +59,15 @@ export async function getDashboardData(req, res) {
 
     // mirrors: PHP $categoryLabels[], $itemCounts[], $stockCounts[] arrays
     const categoryData = categoryDataRes.rows;
+    const stats = statsRes.rows[0];
 
     res.json({
       stats: {
-        total_items:      parseInt(totalItemsRes.rows[0].count),
-        total_categories: parseInt(totalCategoriesRes.rows[0].count),
-        total_suppliers:  parseInt(totalSuppliersRes.rows[0].count),
-        low_stock_items:  parseInt(lowStockRes.rows[0].count),
-        total_value:      parseFloat(totalValueRes.rows[0].total),
+        total_items:      parseInt(stats.total_items),
+        total_categories: parseInt(stats.total_categories),
+        total_suppliers:  parseInt(stats.total_suppliers),
+        low_stock_items:  parseInt(stats.low_stock_items),
+        total_value:      parseFloat(stats.total_value),
       },
       recent_items:     recentItemsRes.rows,
       low_stock_items_list: lowStockListRes.rows,

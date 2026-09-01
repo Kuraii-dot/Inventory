@@ -18,6 +18,7 @@ async function downloadReport(endpoint, payload, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  return filename;
 }
 
 // Distributions Report — replaces: generate_report.php
@@ -42,4 +43,10 @@ export function downloadDepartmentReport(payload) {
 export function downloadAllocationsReport(payload) {
   const ext = payload.format === 'excel' ? 'xlsx' : 'pdf';
   return downloadReport('/reports/allocations', payload, `allocations_report.${ext}`);
+}
+
+// TCMS Inspection Requests Report
+export function downloadInspectionRequestsReport(payload) {
+  const ext = payload.format === 'excel' ? 'xlsx' : 'pdf';
+  return downloadReport('/reports/inspections', payload, `inspection_requests_report.${ext}`);
 }

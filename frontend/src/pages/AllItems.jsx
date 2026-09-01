@@ -9,6 +9,10 @@ import Modal       from '../components/Modal.jsx';
 import client      from '../api/client.js';
 import ReportModal from '../components/ReportModal.jsx';
 import AppIcon    from '../components/AppIcon.jsx';
+import { TableSkeletonRows } from '../components/LoadingSkeletons.jsx';
+import SearchableSelect from '../components/SearchableSelect.jsx';
+import usePersistentState from '../hooks/usePersistentState.js';
+import { stockBadgeClass, stockTextClass } from '../utils/stock.js';
 
 // ── Helpers ───────────────────────────────────────────────────
 function usageRate(stock, distributed) {
@@ -29,7 +33,7 @@ export default function AllItems() {
   const [items,      setItems]      = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [search,     setSearch]     = useState('');
+  const [search,     setSearch]     = usePersistentState('inventory.filters.allItems.search', '');
   const [expanded,   setExpanded]   = useState({});
 
   // Modal visibility
@@ -46,9 +50,9 @@ export default function AllItems() {
   const [ledgerError,   setLedgerError]   = useState('');
 
   // Ledger cascade state
-  const [ledgerCat,   setLedgerCat]   = useState('');
-  const [ledgerCls,   setLedgerCls]   = useState('');
-  const [ledgerItem,  setLedgerItem]  = useState('');
+  const [ledgerCat,   setLedgerCat]   = usePersistentState('inventory.filters.allItems.ledgerCategory', '');
+  const [ledgerCls,   setLedgerCls]   = usePersistentState('inventory.filters.allItems.ledgerClassification', '');
+  const [ledgerItem,  setLedgerItem]  = usePersistentState('inventory.filters.allItems.ledgerItem', '');
   const [clsOptions,  setClsOptions]  = useState([]);
   const [itemOptions, setItemOptions] = useState([]);
 
@@ -59,9 +63,9 @@ export default function AllItems() {
   const [invPreview,        setInvPreview]        = useState(null);
   const [invPreviewLoading, setInvPreviewLoading] = useState(false);
   const [invPreviewError,   setInvPreviewError]   = useState('');
-  const [invDateFrom,       setInvDateFrom]       = useState('');
-  const [invDateTo,         setInvDateTo]         = useState('');
-  const [invFilterType,     setInvFilterType]     = useState('all');
+  const [invDateFrom,       setInvDateFrom]       = usePersistentState('inventory.filters.allItems.dateFrom', '');
+  const [invDateTo,         setInvDateTo]         = usePersistentState('inventory.filters.allItems.dateTo', '');
+  const [invFilterType,     setInvFilterType]     = usePersistentState('inventory.filters.allItems.filterType', 'all');
   const [invExporting,      setInvExporting]      = useState(false);
 
   useEffect(() => {
@@ -79,6 +83,16 @@ export default function AllItems() {
     }
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!ledgerCat) { setClsOptions([]); return; }
+    fetchClassifications(ledgerCat).then(setClsOptions).catch(console.error);
+  }, [ledgerCat]);
+
+  useEffect(() => {
+    if (!ledgerCls) { setItemOptions([]); return; }
+    fetchItemsByClassification(ledgerCls).then(setItemOptions).catch(console.error);
+  }, [ledgerCls]);
 
   // ── Group by category ─────────────────────────────────────
   const grouped = useMemo(() => {
@@ -123,6 +137,7 @@ export default function AllItems() {
   }, [items]);
 
   const visibleCount = Object.values(grouped).flat().length;
+  const firstLoad = loading && items.length === 0;
 
   function toggleGroup(cat) {
     setExpanded(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -305,11 +320,9 @@ export default function AllItems() {
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="6" className="py-16 text-center text-slate-400 animate-pulse">Loading...</td>
-                </tr>
+            <tbody className={`transition-opacity duration-200 ${loading && !firstLoad ? 'opacity-60' : ''}`} aria-busy={loading}>
+              {firstLoad ? (
+                <TableSkeletonRows columns={6} rows={8} />
               ) : Object.keys(grouped).length === 0 ? (
                 <tr>
                   <td colSpan="6" className="py-16 text-center">
@@ -340,7 +353,7 @@ export default function AllItems() {
                             <span className="px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-medium">
                               {catItems.length} item{catItems.length !== 1 ? 's' : ''}
                             </span>
-                            <span className="px-2 py-0.5 bg-sky-100 text-sky-700 rounded-full text-xs font-medium">
+                            <span className={`px-2 py-0.5 border rounded-full text-xs font-medium ${stockBadgeClass(catTotal)}`}>
                               Stock: {catTotal.toLocaleString()}
                             </span>
                             <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
@@ -387,7 +400,7 @@ export default function AllItems() {
                           </span>
                         </td>
                         <td className="py-3 px-6 text-center">
-                          <span className="font-bold text-amber-800">{Number(row.total_stock).toLocaleString()}</span>
+                          <span className={`font-bold ${stockTextClass(row.total_stock)}`}>{Number(row.total_stock).toLocaleString()}</span>
                           <span className="text-xs text-sky-500 ml-1">units</span>
                         </td>
                         <td className="py-3 px-6">
@@ -504,33 +517,29 @@ export default function AllItems() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Filter Type</label>
-              <select value={invFilterType} onChange={e => { setInvFilterType(e.target.value); setInvPreview(null); }}
-                className={selectCls}>
-                <option value="all">All Items</option>
-                <option value="category">By Category</option>
-                <option value="classification">By Classification</option>
-                <option value="period">Custom Period</option>
-                <option value="month">This Month</option>
-              </select>
+              <SearchableSelect value={invFilterType} allowEmpty={false}
+                onChange={value => { setInvFilterType(value); setInvPreview(null); }}
+                placeholder="Select filter type" searchPlaceholder="Search filter types..."
+                options={[
+                  ['all','All Items'], ['category','By Category'], ['classification','By Classification'],
+                  ['period','Custom Period'], ['month','This Month'],
+                ].map(([value, label]) => ({ value, label }))} />
             </div>
             {(invFilterType === 'category' || invFilterType === 'classification') && (
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Category</label>
-                <select value={ledgerCat} onChange={e => handleLedgerCatChange(e.target.value)} className={selectCls}>
-                  <option value="">Select Category</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <SearchableSelect value={ledgerCat} onChange={handleLedgerCatChange}
+                  placeholder="Select Category" searchPlaceholder="Search categories..."
+                  options={categories.map(c => ({ value: c.id, label: c.name }))} />
               </div>
             )}
             {invFilterType === 'classification' && (
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Classification</label>
-                <select value={ledgerCls} onChange={e => handleLedgerClsChange(e.target.value)}
-                  disabled={!clsOptions.length}
-                  className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-                  <option value="">Select Classification</option>
-                  {clsOptions.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
-                </select>
+                <SearchableSelect value={ledgerCls} onChange={handleLedgerClsChange}
+                  disabled={!clsOptions.length} placeholder="Select Classification"
+                  searchPlaceholder="Search classifications..."
+                  options={clsOptions.map(c => ({ value: c.id, label: c.classification_name }))} />
               </div>
             )}
             {(invFilterType === 'category' || invFilterType === 'classification') && (<>
@@ -591,7 +600,7 @@ export default function AllItems() {
                       <td className="py-2 px-4 text-xs text-slate-500">{item.sku || '—'}</td>
                       <td className="py-2 px-4 text-sm font-medium text-slate-800">{item.name}</td>
                       <td className="py-2 px-4 text-sm text-slate-600">{item.unit || 'Pcs'}</td>
-                      <td className="py-2 px-4 text-sm text-slate-800 text-right font-semibold">{item.quantity}</td>
+                      <td className={`py-2 px-4 text-sm text-right font-bold ${stockTextClass(item.quantity)}`}>{item.quantity}</td>
                       <td className="py-2 px-4 text-sm text-slate-800 text-right">₱{parseFloat(item.unit_price ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                       <td className="py-2 px-4 text-sm text-slate-800 text-right font-semibold">₱{parseFloat(item.amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                     </tr>
@@ -621,28 +630,28 @@ export default function AllItems() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
-              <select value={ledgerCat} onChange={e => handleLedgerCatChange(e.target.value)} className={selectCls}>
-                <option value="">Select Category</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <SearchableSelect value={ledgerCat} onChange={handleLedgerCatChange}
+                placeholder="Select Category" searchPlaceholder="Search categories..."
+                options={categories.map(c => ({ value: c.id, label: c.name }))} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Classification</label>
-              <select value={ledgerCls} onChange={e => handleLedgerClsChange(e.target.value)}
-                disabled={!clsOptions.length}
-                className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-                <option value="">Select Classification</option>
-                {clsOptions.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
-              </select>
+              <SearchableSelect value={ledgerCls} onChange={handleLedgerClsChange}
+                disabled={!clsOptions.length} placeholder="Select Classification"
+                searchPlaceholder="Search classifications..."
+                options={clsOptions.map(c => ({ value: c.id, label: c.classification_name }))} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Item</label>
-              <select value={ledgerItem} onChange={e => setLedgerItem(e.target.value)}
-                disabled={!itemOptions.length}
-                className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-                <option value="">Select Item</option>
-                {itemOptions.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.quantity})</option>)}
-              </select>
+              <SearchableSelect value={ledgerItem} onChange={setLedgerItem}
+                disabled={!itemOptions.length} placeholder="Select Item"
+                searchPlaceholder="Search inventory items..."
+                options={itemOptions.map(item => ({
+                  value: item.id,
+                  label: `Item #${item.id} — ${item.name}`,
+                  keywords: `${item.name} ${item.id}`,
+                  stock: item.quantity,
+                }))} />
             </div>
           </div>
           <div className="flex justify-center">
@@ -682,7 +691,7 @@ export default function AllItems() {
               <div>
                 <h3 className="text-xl font-bold text-slate-800">{ledgerData.item_info.name}</h3>
                 <p className="text-sm text-slate-500">{ledgerData.item_info.category} · {ledgerData.item_info.classification}</p>
-                <p className="text-sm font-medium text-emerald-600">Current Stock: <strong>{ledgerData.item_info.current_stock}</strong> units</p>
+                <p className={`text-sm font-medium ${stockTextClass(ledgerData.item_info.current_stock)}`}>Current Stock: <strong>{ledgerData.item_info.current_stock}</strong> units</p>
               </div>
             </div>
 
@@ -693,7 +702,7 @@ export default function AllItems() {
                 { label: 'Total IN',     val: `+${ledgerData.summary.total_in}`, bg: 'bg-emerald-50',   cls: 'text-emerald-600' },
                 { label: 'Total OUT',    val: `-${ledgerData.summary.total_out}`,bg: 'bg-red-50',       cls: 'text-red-600'     },
                 { label: 'Returns',      val: `+${ledgerData.summary.total_returns}`, bg: 'bg-blue-50', cls: 'text-blue-600'    },
-                { label: 'Current Stock',val: ledgerData.summary.current_stock,  bg: 'bg-amber-50',    cls: 'text-amber-600'   },
+                { label: 'Current Stock',val: ledgerData.summary.current_stock,  bg: 'bg-slate-50',    cls: stockTextClass(ledgerData.summary.current_stock) },
               ].map(s => (
                 <div key={s.label} className={`${s.bg} rounded-xl p-4 border border-slate-100 shadow-sm text-center`}>
                   <p className="text-xs text-slate-500 mb-1">{s.label}</p>
@@ -759,7 +768,7 @@ export default function AllItems() {
                           <td className={`py-3 px-4 font-semibold ${isIn ? 'text-emerald-600' : 'text-red-600'}`}>
                             {isIn ? '+' : '-'}{row.quantity}
                           </td>
-                          <td className="py-3 px-4 font-bold text-slate-800">{row.balance}</td>
+                          <td className={`py-3 px-4 font-bold ${stockTextClass(row.balance)}`}>{row.balance}</td>
                           <td className="py-3 px-4 text-sm text-slate-500">{row.details || '—'}</td>
                         </tr>
                       );

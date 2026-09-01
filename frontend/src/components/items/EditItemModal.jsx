@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import Modal from '../Modal.jsx';
 import { fetchItemById, updateItem } from '../../api/items.js';
 import { fetchClassifications } from '../../api/items.js';
+import SearchableSelect from '../SearchableSelect.jsx';
 
 export default function EditItemModal({ itemId, open, onClose, categories, suppliers, onSuccess }) {
   const [form, setForm] = useState({
@@ -85,27 +86,27 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
-            <select name="category_id" required value={form.category_id} onChange={handleChange} className={inputCls}>
-              <option value="">-- Select Category --</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect name="category_id" required value={form.category_id}
+              onChange={value => setForm(f => ({ ...f, category_id: value, classification_id: '' }))}
+              placeholder="Select Category" searchPlaceholder="Search categories..."
+              options={categories.map(c => ({ value: c.id, label: c.name }))} />
           </div>
 
           {/* mirrors: #editClassification — populated by initEditModal() */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Classification</label>
-            <select name="classification_id" value={form.classification_id} onChange={handleChange} className={inputCls}>
-              <option value="">-- Select Classification --</option>
-              {classifications.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
-            </select>
+            <SearchableSelect name="classification_id" value={form.classification_id}
+              onChange={value => setForm(f => ({ ...f, classification_id: value }))}
+              placeholder="Select Classification" searchPlaceholder="Search classifications..."
+              options={classifications.map(c => ({ value: c.id, label: c.classification_name }))} />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Supplier</label>
-            <select name="supplier_id" required value={form.supplier_id} onChange={handleChange} className={inputCls}>
-              <option value="">-- Select Supplier --</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <SearchableSelect name="supplier_id" required value={form.supplier_id}
+              onChange={value => setForm(f => ({ ...f, supplier_id: value }))}
+              placeholder="Select Supplier" searchPlaceholder="Search suppliers..."
+              options={suppliers.map(s => ({ value: s.id, label: s.name }))} />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -140,14 +141,10 @@ export default function EditItemModal({ itemId, open, onClose, categories, suppl
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Unit *</label>
-              <select name="unit" required value={form.unit} onChange={handleChange} className={inputCls}>
-                <option value="Pc">Pc</option>
-                <option value="Pcs">Pcs</option>
-                <option value="Set">Set</option>
-                <option value="Mtr">Mtr</option>
-                <option value="Mtrs">Mtrs</option>
-                <option value="Assy">Assy</option>
-              </select>
+              <SearchableSelect name="unit" required value={form.unit} allowEmpty={false}
+                onChange={value => setForm(f => ({ ...f, unit: value }))}
+                placeholder="Select Unit" searchPlaceholder="Search units..."
+                options={['Pc','Pcs','Set','Mtr','Mtrs','Assy'].map(unit => ({ value: unit, label: unit }))} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Unit Price (₱)</label>

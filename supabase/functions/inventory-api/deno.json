@@ -1,0 +1,12 @@
+{
+  "nodeModulesDir": "auto",
+  "imports": {
+    "@supabase/server": "npm:@supabase/server@^1",
+    "bcryptjs": "npm:bcryptjs@2.4.3",
+    "dotenv": "npm:dotenv@16.4.5",
+    "exceljs": "npm:exceljs@4.4.0",
+    "jsonwebtoken": "npm:jsonwebtoken@9.0.2",
+    "pdfkit": "npm:pdfkit@0.15.0",
+    "pg": "npm:pg@8.12.0"
+  }
+}

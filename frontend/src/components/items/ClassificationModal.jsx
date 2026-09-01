@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Modal from '../Modal.jsx';
-import client from '../../api/client.js';
-import { fetchClassifications, createClassification } from '../../api/items.js';
+import { createClassification, deleteClassification, fetchClassifications, updateClassification } from '../../api/items.js';
 import AppIcon from '../AppIcon.jsx';
+import SearchableSelect from '../SearchableSelect.jsx';
 
 export default function ClassificationModal({ open, onClose, categories, showToast }) {
   const [selectedCategory,  setSelectedCategory]  = useState('');
@@ -45,7 +45,7 @@ export default function ClassificationModal({ open, onClose, categories, showToa
   async function handleUpdate(id) {
     if (!editName.trim()) return;
     try {
-      await client.put(`/classifications/${id}`, { classification_name: editName.trim() });
+      await updateClassification(id, editName.trim());
       showToast('Classification updated!', 'success');
       setEditId(null);
       loadList(selectedCategory);
@@ -55,10 +55,10 @@ export default function ClassificationModal({ open, onClose, categories, showToa
   }
 
   // ── Delete ────────────────────────────────────────────────
-  async function handleDelete(id) {
-    if (!confirm('Delete this classification?')) return;
+  async function handleDelete(id, name) {
+    if (!confirm(`WARNING: Delete classification "${name}"?\n\nThis may affect categorized inventory items. This action cannot be undone.`)) return;
     try {
-      await client.delete(`/classifications/${id}`);
+      await deleteClassification(id);
       showToast('Classification deleted!', 'success');
       loadList(selectedCategory);
     } catch (err) {
@@ -78,11 +78,9 @@ export default function ClassificationModal({ open, onClose, categories, showToa
       <form onSubmit={handleSubmit}
         className="mb-6 p-5 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
         <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
-        <select required value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}
-          className="w-full mb-3 px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
-          <option value="">Select Category</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <SearchableSelect required value={selectedCategory} onChange={setSelectedCategory}
+          className="mb-3" placeholder="Select Category" searchPlaceholder="Search categories..."
+          options={categories.map(c => ({ value: c.id, label: c.name }))} />
 
         <label className="block text-sm font-medium text-slate-700 mb-2">Classification Name *</label>
         <div className="flex gap-3">
@@ -139,7 +137,7 @@ export default function ClassificationModal({ open, onClose, categories, showToa
                       className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
                       <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                     </button>
-                    <button onClick={() => handleDelete(cls.id)}
+                    <button onClick={() => handleDelete(cls.id, cls.classification_name)}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium">
                       <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                     </button>

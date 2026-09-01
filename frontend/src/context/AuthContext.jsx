@@ -7,6 +7,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { loginRequest, logoutRequest, getMeRequest } from '../api/auth.js';
+import { supabase } from '../api/supabase.js';
 
 const AuthContext = createContext(null);
 
@@ -14,29 +15,40 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true); // rehydrating from localStorage
 
-  // On app load: restore session from localStorage (like PHP re-reading $_SESSION)
+  // Supabase securely persists and refreshes the signed-in session. The public
+  // users row remains the source of the Inventory username and application role.
   useEffect(() => {
-    const token    = localStorage.getItem('token');
-    const stored   = localStorage.getItem('user');
-
-    if (token && stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem('user');
+    let active = true;
+    const restore = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        if (active) { setUser(null); setLoading(false); }
+        return;
       }
-      // Optionally verify with server (catches expired tokens)
-      getMeRequest()
-        .then(({ user }) => setUser(user))
-        .catch(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setUser(null);
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+      try {
+        const { user: profile } = await getMeRequest();
+        if (active) {
+          setUser(profile);
+          localStorage.setItem('user', JSON.stringify(profile));
+        }
+      } catch {
+        await supabase.auth.signOut({ scope: 'local' });
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void restore();
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' && active) {
+        localStorage.removeItem('user');
+        setUser(null);
+      }
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   /**
@@ -44,8 +56,7 @@ export function AuthProvider({ children }) {
    * Sets $_SESSION['user_id'], ['username'], ['role'] → stores token + user
    */
   async function login(username, password) {
-    const { token, user } = await loginRequest(username, password);
-    localStorage.setItem('token', token);
+    const { user } = await loginRequest(username, password);
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
     return user;
@@ -57,7 +68,6 @@ export function AuthProvider({ children }) {
    */
   async function logout() {
     try { await logoutRequest(); } catch (_) {}
-    localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
   }

@@ -12,6 +12,7 @@ import {
 } from '../../api/combinations.js';
 import { fetchCategories, fetchItemsByCategory } from '../../api/items.js';
 import AppIcon from '../AppIcon.jsx';
+import SearchableSelect from '../SearchableSelect.jsx';
 
 // Simple item selector row — category → item → quantity
 // No classification needed since combination_items doesn't store it
@@ -22,8 +23,6 @@ function ItemSelectorRow({ row, idx, categories, onChange, onRemove, showRemove 
     if (!row.category_id) return;
     fetchItemsByCategory(row.category_id).then(setItems).catch(console.error);
   }, [row.category_id]);
-
-  const selectCls = "w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 text-sm";
 
   return (
     <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 relative">
@@ -36,20 +35,21 @@ function ItemSelectorRow({ row, idx, categories, onChange, onRemove, showRemove 
       <div className="grid grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Category *</label>
-          <select value={row.category_id} onChange={e => onChange(idx, 'category_id', e.target.value)}
-            required className={selectCls}>
-            <option value="">Select Category</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <SearchableSelect value={row.category_id} onChange={value => onChange(idx, 'category_id', value)}
+            required placeholder="Select Category" searchPlaceholder="Search categories..."
+            options={categories.map(c => ({ value: c.id, label: c.name }))} />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Item *</label>
-          <select value={row.item_id} onChange={e => onChange(idx, 'item_id', e.target.value)}
-            disabled={!items.length} required
-            className={`${selectCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-            <option value="">Select Item</option>
-            {items.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.quantity})</option>)}
-          </select>
+          <SearchableSelect value={row.item_id} onChange={value => onChange(idx, 'item_id', value)}
+            disabled={!items.length} required placeholder="Select Item"
+            searchPlaceholder="Search inventory items..."
+            options={items.map(i => ({
+              value: i.id,
+              label: `Item #${i.id} — ${i.name}`,
+              keywords: `${i.name} ${i.id}`,
+              stock: i.quantity,
+            }))} />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Quantity *</label>
@@ -168,7 +168,7 @@ export default function CombinationsModal({ open, onClose, showToast }) {
 
   // ── Delete ──────────────────────────────────────────────────
   async function handleDelete(id, name) {
-    if (!confirm(`Delete combination "${name}"?`)) return;
+    if (!confirm(`WARNING: Delete combination "${name}"?\n\nSaved combination items will be permanently removed. This cannot be undone.`)) return;
     try {
       await deleteCombination(id);
       showToast(`"${name}" deleted.`, 'success');

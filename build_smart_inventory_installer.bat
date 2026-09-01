@@ -42,16 +42,35 @@ if not exist "%FRONTEND_DIR%\.env.tauri" (
   goto :failed
 )
 
-findstr /B /C:"VITE_API_URL=https://" "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
+findstr /B /C:"VITE_API_URL=http://" /C:"VITE_API_URL=https://" "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
 if errorlevel 1 (
-  echo ERROR: VITE_API_URL in .env.tauri must use a public HTTPS address.
+  echo ERROR: VITE_API_URL in .env.tauri must use an HTTP or HTTPS API address.
   goto :failed
 )
 
-findstr /I /C:"localhost" /C:"127.0.0.1" /C:"192.168." "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
+findstr /I /C:"localhost" /C:"127.0.0.1" "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
 if not errorlevel 1 (
-  echo ERROR: .env.tauri still contains a local or office-LAN address.
-  echo Production installers must use the public API address.
+  echo ERROR: .env.tauri points to localhost.
+  echo Installed Tauri clients must use the Inventory Supabase cloud endpoint.
+  goto :failed
+)
+
+findstr /B /C:"VITE_SUPABASE_URL=https://" "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
+if errorlevel 1 (
+  echo ERROR: VITE_SUPABASE_URL is missing or is not HTTPS.
+  goto :failed
+)
+
+findstr /B /C:"VITE_SUPABASE_PUBLISHABLE_KEY=" "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
+if errorlevel 1 (
+  echo ERROR: VITE_SUPABASE_PUBLISHABLE_KEY is missing.
+  goto :failed
+)
+
+findstr /I /C:"PASTE_SUPABASE_PUBLISHABLE_KEY_HERE" "%FRONTEND_DIR%\.env.tauri" >nul 2>&1
+if not errorlevel 1 (
+  echo ERROR: Configure the Inventory Supabase publishable key before building.
+  echo Run tools\setup\configure_inventory_supabase_cloud.bat from this project.
   goto :failed
 )
 

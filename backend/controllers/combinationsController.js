@@ -5,6 +5,29 @@
 
 import pool from '../db/pool.js';
 
+function normalizeCombinationItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('At least one item is required.');
+  }
+
+  const normalized = items.map((item, index) => {
+    const itemId = Number(item?.item_id);
+    const quantity = Number(item?.quantity_required ?? item?.quantity);
+    if (!Number.isSafeInteger(itemId) || itemId <= 0) {
+      throw new Error(`Select a valid inventory item on row ${index + 1}.`);
+    }
+    if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+      throw new Error(`Enter a valid quantity on row ${index + 1}.`);
+    }
+    return { item_id: itemId, quantity_required: quantity };
+  });
+
+  if (new Set(normalized.map(item => item.item_id)).size !== normalized.length) {
+    throw new Error('The same inventory item cannot be added to a combination twice.');
+  }
+  return normalized;
+}
+
 // ─────────────────────────────────────────────────────────────
 // GET /api/combinations
 // ─────────────────────────────────────────────────────────────
@@ -76,14 +99,19 @@ export async function getCombinationById(req, res) {
 // Body: { combination_name, description, created_by, items: [{ item_id, quantity_required }] }
 // ─────────────────────────────────────────────────────────────
 export async function createCombination(req, res) {
-  const { combination_name, description = '', created_by = '', items } = req.body;
+  const { combination_name, description = '', items } = req.body;
 
   if (!combination_name?.trim()) {
     return res.status(400).json({ status: 'error', message: 'Combination name is required.' });
   }
-  if (!items?.length) {
-    return res.status(400).json({ status: 'error', message: 'At least one item is required.' });
-  }
+  let normalizedItems;
+  try { normalizedItems = normalizeCombinationItems(items); }
+  catch (error) { return res.status(400).json({ status: 'error', message: error.message }); }
+
+  const authenticatedUserId = Number(req.user?.id);
+  const createdBy = Number.isSafeInteger(authenticatedUserId) && authenticatedUserId > 0
+    ? authenticatedUserId
+    : null;
 
   const client = await pool.connect();
   try {
@@ -92,11 +120,11 @@ export async function createCombination(req, res) {
     const comboRes = await client.query(
       `INSERT INTO combinations (name, description, is_active, created_by, created_at, updated_at)
        VALUES ($1, $2, true, $3, NOW(), NOW()) RETURNING id`,
-      [combination_name.trim(), description, created_by]
+      [combination_name.trim(), description, createdBy]
     );
     const comboId = comboRes.rows[0].id;
 
-    for (const item of items) {
+    for (const item of normalizedItems) {
       await client.query(
         `INSERT INTO combination_items (combination_id, item_id, quantity_required, quantity)
          VALUES ($1, $2, $3, $3)`,
@@ -121,9 +149,12 @@ export async function updateCombination(req, res) {
   const { id } = req.params;
   const { combination_name, description = '', items } = req.body;
 
-  if (!combination_name?.trim() || !items?.length) {
-    return res.status(400).json({ status: 'error', message: 'Name and items are required.' });
+  if (!combination_name?.trim()) {
+    return res.status(400).json({ status: 'error', message: 'Combination name is required.' });
   }
+  let normalizedItems;
+  try { normalizedItems = normalizeCombinationItems(items); }
+  catch (error) { return res.status(400).json({ status: 'error', message: error.message }); }
 
   const client = await pool.connect();
   try {
@@ -137,7 +168,7 @@ export async function updateCombination(req, res) {
     // Delete old items and re-insert
     await client.query('DELETE FROM combination_items WHERE combination_id = $1', [id]);
 
-    for (const item of items) {
+    for (const item of normalizedItems) {
       await client.query(
         `INSERT INTO combination_items (combination_id, item_id, quantity_required, quantity)
          VALUES ($1, $2, $3, $3)`,

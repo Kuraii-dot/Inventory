@@ -41,8 +41,8 @@ export default function SupplierModal({ open, onClose, suppliers, onRefresh, sho
   }
 
   // mirrors: deleteSupplier() in supplier.js
-  async function handleDelete(id) {
-    if (!confirm('Are you sure you want to delete this supplier?')) return;
+  async function handleDelete(id, name) {
+    if (!confirm(`WARNING: Delete supplier "${name}"?\n\nThis action cannot be undone.`)) return;
     try {
       await deleteSupplier(id);
       showToast('Supplier deleted successfully!', 'success');
@@ -94,7 +94,7 @@ export default function SupplierModal({ open, onClose, suppliers, onRefresh, sho
                       className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
                       <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                     </button>
-                    <button onClick={() => handleDelete(sup.id)}
+                    <button onClick={() => handleDelete(sup.id, sup.name)}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium">
                       <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                     </button>

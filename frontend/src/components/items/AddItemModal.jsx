@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import Modal from '../Modal.jsx';
 import { createItem } from '../../api/items.js';
 import { fetchClassifications } from '../../api/items.js';
+import SearchableSelect from '../SearchableSelect.jsx';
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -67,29 +68,28 @@ export default function AddItemModal({ open, onClose, categories, suppliers, onS
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
-            <select name="category_id" required value={form.category_id} onChange={handleChange} className={inputCls}>
-              <option value="">Select Category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SearchableSelect name="category_id" required value={form.category_id}
+              onChange={value => setForm(f => ({ ...f, category_id: value }))}
+              placeholder="Select Category" searchPlaceholder="Search categories..."
+              options={categories.map(c => ({ value: c.id, label: c.name }))} />
           </div>
 
           {/* mirrors: classificationSelect disabled until category is picked */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Classification</label>
-            <select name="classification_id" value={form.classification_id} onChange={handleChange}
+            <SearchableSelect name="classification_id" value={form.classification_id}
+              onChange={value => setForm(f => ({ ...f, classification_id: value }))}
               disabled={!form.category_id || classifications.length === 0}
-              className={`${inputCls} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-              <option value="">Select Classification</option>
-              {classifications.map(c => <option key={c.id} value={c.id}>{c.classification_name}</option>)}
-            </select>
+              placeholder="Select Classification" searchPlaceholder="Search classifications..."
+              options={classifications.map(c => ({ value: c.id, label: c.classification_name }))} />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Supplier *</label>
-            <select name="supplier_id" required value={form.supplier_id} onChange={handleChange} className={inputCls}>
-              <option value="">Select Supplier</option>
-              {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <SearchableSelect name="supplier_id" required value={form.supplier_id}
+              onChange={value => setForm(f => ({ ...f, supplier_id: value }))}
+              placeholder="Select Supplier" searchPlaceholder="Search suppliers..."
+              options={suppliers.map(s => ({ value: s.id, label: s.name }))} />
           </div>
         </div>
 
@@ -109,13 +109,10 @@ export default function AddItemModal({ open, onClose, categories, suppliers, onS
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Unit *</label>
-            <select name="unit" required value={form.unit} onChange={handleChange} className={inputCls}>
-              <option value="Pc">Pc</option>
-              <option value="Pcs">Pcs</option>
-              <option value="Mtr">Mtr</option>
-              <option value="Mtrs">Mtrs</option>
-              <option value="Assy">Assy</option>
-            </select>
+            <SearchableSelect name="unit" required value={form.unit} allowEmpty={false}
+              onChange={value => setForm(f => ({ ...f, unit: value }))}
+              placeholder="Select Unit" searchPlaceholder="Search units..."
+              options={['Pc','Pcs','Mtr','Mtrs','Assy'].map(unit => ({ value: unit, label: unit }))} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Unit Price (₱) *</label>

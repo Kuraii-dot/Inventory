@@ -42,8 +42,8 @@ export default function CategoryModal({ open, onClose, categories, onRefresh, sh
   }
 
   // mirrors: deleteCategory() JS function
-  async function handleDelete(id) {
-    if (!confirm('Are you sure you want to delete this category?')) return;
+  async function handleDelete(id, name) {
+    if (!confirm(`WARNING: Delete category "${name}"?\n\nThis may affect where inventory items appear. This action cannot be undone.`)) return;
     try {
       await deleteCategory(id);
       showToast('Category deleted successfully!', 'success');
@@ -96,7 +96,7 @@ export default function CategoryModal({ open, onClose, categories, onRefresh, sh
                       className="px-3 py-1.5 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors text-xs font-medium">
                       <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
                     </button>
-                    <button onClick={() => handleDelete(cat.id)}
+                    <button onClick={() => handleDelete(cat.id, cat.name)}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium">
                       <AppIcon name="trash" size={13} className="app-icon-inline mr-1" /> Delete
                     </button>

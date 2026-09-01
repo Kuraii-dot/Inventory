@@ -127,18 +127,23 @@ export async function getItems(req, res) {
 export async function getAllItemsOverview(req, res) {
   try {
     const result = await pool.query(`
+      WITH distribution_totals AS (
+        SELECT item_id, SUM(quantity) AS total_distributed
+        FROM distributions
+        GROUP BY item_id
+      )
       SELECT
         i.name                     AS item_name,
         COUNT(DISTINCT i.id)       AS variant_count,
         SUM(i.quantity)            AS total_stock,
-        COALESCE(SUM(d.quantity), 0) AS total_distributed,
+        COALESCE(SUM(d.total_distributed), 0) AS total_distributed,
         MIN(c.name)                AS category_name,
         MIN(i.unit_price)          AS min_price,
         MAX(i.unit_price)          AS max_price,
         COUNT(DISTINCT c.id)       AS category_count
       FROM items i
       LEFT JOIN categories    c ON i.category_id = c.id
-      LEFT JOIN distributions d ON i.id          = d.item_id
+      LEFT JOIN distribution_totals d ON i.id = d.item_id
       GROUP BY i.name
       ORDER BY i.name ASC
     `);
@@ -347,7 +352,7 @@ export async function restoreItem(req, res) {
     if (!check.rows[0])
       return res.status(404).json({ success: false, message: 'Item not found.' });
 
-    await pool.query('UPDATE items SET is_active = true WHERE id = $1', [id]);
+    await pool.query('UPDATE items SET is_active = true, updated_at = NOW() WHERE id = $1', [id]);
     res.json({ success: true, message: `"${check.rows[0].name}" restored successfully.` });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Database error: ' + err.message });
@@ -368,12 +373,26 @@ export async function validateStock(req, res) {
   }
 
   try {
-    const result = await pool.query('SELECT quantity FROM items WHERE id = $1', [item_id]);
+    const result = await pool.query(
+      `SELECT id, name, category_id, classification_id, unit
+       FROM items WHERE id = $1 AND is_active = true`,
+      [item_id]
+    );
     const item = result.rows[0];
 
     if (!item) return res.json({ valid: false, message: 'Item not found', available: 0 });
 
-    const available = parseInt(item.quantity);
+    const stock = await pool.query(
+      `SELECT COALESCE(SUM(quantity), 0) AS available
+       FROM items
+       WHERE name = $1
+         AND category_id = $2
+         AND classification_id IS NOT DISTINCT FROM $3
+         AND unit = $4
+         AND is_active = true`,
+      [item.name, item.category_id, item.classification_id, item.unit]
+    );
+    const available = parseInt(stock.rows[0].available, 10);
     if (qty > available) {
       res.json({ valid: false, message: 'Insufficient stock', available });
     } else {

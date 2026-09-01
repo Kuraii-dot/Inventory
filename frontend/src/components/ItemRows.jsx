@@ -7,6 +7,7 @@ import {
   validateStock,
 } from '../api/items.js';
 import AppIcon from './AppIcon.jsx';
+import SearchableSelect from './SearchableSelect.jsx';
 
 const EMPTY_ROW = { category_id: '', classification_id: '', item_id: '', quantity: '' };
 
@@ -65,8 +66,6 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
     } catch { setStockWarning(null); }
   }
 
-  const sel = "w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm";
-
   return (
     <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 relative">
       {showRemove && (
@@ -80,40 +79,35 @@ function ItemRow({ row, idx, categories, onRowChange, onRemove, showRemove, show
         {/* Category */}
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Category *</label>
-          <select value={row.category_id}
-            onChange={e => handleCategoryChange(e.target.value)}
-            required className={sel}>
-            <option value="">Select Category</option>
-            {categories.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-          </select>
+          <SearchableSelect value={row.category_id} onChange={handleCategoryChange} required
+            placeholder="Select Category" searchPlaceholder="Search categories..."
+            options={categories.map(c => ({ value: c.id, label: c.name }))} />
         </div>
 
         {/* Classification */}
         {showClassification && (
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Classification</label>
-            <select value={row.classification_id}
-              onChange={e => handleClassificationChange(e.target.value)}
-              disabled={clsOptions.length === 0}
-              className={`${sel} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-              <option value="">Select Classification</option>
-              {clsOptions.map(c => <option key={c.id} value={String(c.id)}>{c.classification_name}</option>)}
-            </select>
+            <SearchableSelect value={row.classification_id} onChange={handleClassificationChange}
+              disabled={clsOptions.length === 0} placeholder="Select Classification"
+              searchPlaceholder="Search classifications..."
+              options={clsOptions.map(c => ({ value: c.id, label: c.classification_name }))} />
           </div>
         )}
 
         {/* Item */}
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">Item *</label>
-          <select value={row.item_id}
-            onChange={e => onRowChange(idx, { item_id: e.target.value })}
-            disabled={itemOptions.length === 0}
-            required className={`${sel} disabled:bg-slate-100 disabled:cursor-not-allowed`}>
-            <option value="">Select Item</option>
-            {itemOptions.map(i => (
-              <option key={i.id} value={String(i.id)}>{i.name} (Stock: {i.quantity})</option>
-            ))}
-          </select>
+          <SearchableSelect value={row.item_id}
+            onChange={itemId => onRowChange(idx, { item_id: itemId })}
+            disabled={itemOptions.length === 0} required placeholder="Select Item"
+            searchPlaceholder="Search inventory items..."
+            options={itemOptions.map(i => ({
+              value: i.id,
+              label: `Item #${i.id} — ${i.name}`,
+              keywords: `${i.name} ${i.id}`,
+              stock: i.quantity,
+            }))} />
         </div>
 
         {/* Quantity */}

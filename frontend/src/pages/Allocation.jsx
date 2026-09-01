@@ -13,6 +13,9 @@ import GroupedTable from '../components/GroupedTable.jsx';
 import ItemRows     from '../components/ItemRows.jsx';
 import ReportModal  from '../components/ReportModal.jsx';
 import AppIcon      from '../components/AppIcon.jsx';
+import { InlineSkeleton, TableSkeletonRows } from '../components/LoadingSkeletons.jsx';
+import SearchableSelect from '../components/SearchableSelect.jsx';
+import usePersistentState from '../hooks/usePersistentState.js';
 
 const DEPARTMENTS = ['Admin', 'Engineering', 'Commercial', 'Finance'];
 
@@ -31,7 +34,7 @@ export default function Allocation() {
   const [records,    setRecords]    = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [filters,    setFilters]    = useState({ search: '', timeframe: 'all', startDate: '', endDate: '' });
+  const [filters,    setFilters]    = usePersistentState('inventory.filters.allocations', { search: '', timeframe: 'all', startDate: '', endDate: '' });
   const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -52,6 +55,7 @@ export default function Allocation() {
   // Edit / return form state
   const [editForm,   setEditForm]   = useState({});
   const [returnForm, setReturnForm] = useState({ return_quantity: '', return_reason: '' });
+  const firstLoad = loading && records.length === 0;
 
   // ── Load ──────────────────────────────────────────────────
   const loadAllocations = useCallback(async (pg = 1) => {
@@ -137,10 +141,11 @@ export default function Allocation() {
   }
 
   // ── Delete ────────────────────────────────────────────────
-  async function handleDelete(id) {
-    if (!confirm('Delete this allocation? Stock will be restored.')) return;
+  async function handleDelete(row) {
+    const warning = `WARNING: Delete this allocation?\n\n${row.item_name} (Item #${row.item_id})\nQuantity: ${row.quantity}\n\nStock will be restored to this exact item record and the allocation will be marked deleted.`;
+    if (!confirm(warning)) return;
     try {
-      await deleteAllocation(id);
+      await deleteAllocation(row.id);
       showToast('Allocation deleted successfully.');
       loadAllocations(page);
     } catch {
@@ -209,7 +214,9 @@ export default function Allocation() {
           {fmtDate(row.created_at)}<br />
           <span className="text-slate-400">{fmtTime(row.created_at)}</span>
         </td>
-        <td className="py-3 px-6 text-sm font-medium text-slate-900">{row.item_name}</td>
+        <td className="py-3 px-6 text-sm font-medium text-slate-900">
+          {row.item_name}<span className="block text-[11px] font-semibold text-slate-400">Item #{row.item_id}</span>
+        </td>
         <td className="py-3 px-6 text-sm text-slate-700">{row.category_name}</td>
         <td className="py-3 px-6 font-semibold text-purple-600">{row.quantity}</td>
         <td className="py-3 px-6 text-sm text-slate-700">{row.department}</td>
@@ -228,7 +235,7 @@ export default function Allocation() {
               className="px-3 py-1.5 bg-pink-100 text-pink-700 rounded-lg hover:bg-pink-200 text-xs font-medium">
               <AppIcon name="edit" size={13} className="app-icon-inline mr-1" /> Edit
             </button>
-            <button onClick={() => handleDelete(row.id)}
+            <button onClick={() => handleDelete(row)}
               className="px-2 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs font-medium">
               <AppIcon name="trash" size={13} />
             </button>
@@ -286,16 +293,13 @@ export default function Allocation() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-2">Timeframe</label>
-                <select value={filters.timeframe}
-                  onChange={e => setFilters(f => ({ ...f, timeframe: e.target.value }))}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition">
-                  <option value="all">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="year">This Year</option>
-                  <option value="custom">Custom Range</option>
-                </select>
+                <SearchableSelect value={filters.timeframe} allowEmpty={false}
+                  onChange={value => setFilters(f => ({ ...f, timeframe: value }))}
+                  placeholder="Select timeframe" searchPlaceholder="Search timeframes..."
+                  options={[
+                    ['all','All Time'], ['today','Today'], ['week','This Week'],
+                    ['month','This Month'], ['year','This Year'], ['custom','Custom Range'],
+                  ].map(([value, label]) => ({ value, label }))} />
               </div>
               <div className="flex items-end">
                 <button type="submit"
@@ -325,7 +329,7 @@ export default function Allocation() {
 
           <div className="mt-4 pt-4 border-t border-slate-100">
             <span className="text-sm font-medium text-slate-600">
-              {loading ? 'Loading...' : `${totalCount} allocation${totalCount !== 1 ? 's' : ''} found`}
+              {firstLoad ? <InlineSkeleton /> : loading ? `Refreshing ${totalCount} allocations…` : `${totalCount} allocation${totalCount !== 1 ? 's' : ''} found`}
             </span>
           </div>
         </div>
@@ -341,13 +345,9 @@ export default function Allocation() {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={COLS.length} className="py-16 text-center text-slate-400 animate-pulse">
-                      Loading...
-                    </td>
-                  </tr>
+              <tbody className={`divide-y divide-slate-100 transition-opacity duration-200 ${loading && !firstLoad ? 'opacity-60' : ''}`} aria-busy={loading}>
+                {firstLoad ? (
+                  <TableSkeletonRows columns={COLS.length} rows={7} />
                 ) : (
                   <GroupedTable
                     rows={records}
@@ -391,12 +391,10 @@ export default function Allocation() {
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Department *</label>
-                <select required value={allocForm.department}
-                  onChange={e => setAllocForm(f => ({ ...f, department: e.target.value }))}
-                  className={inputCls}>
-                  <option value="">Select Department</option>
-                  {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
-                </select>
+                <SearchableSelect required value={allocForm.department}
+                  onChange={value => setAllocForm(f => ({ ...f, department: value }))}
+                  placeholder="Select Department" searchPlaceholder="Search departments..."
+                  options={DEPARTMENTS.map(department => ({ value: department, label: department }))} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Allocated By *</label>
@@ -458,11 +456,10 @@ export default function Allocation() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Department *</label>
-              <select required value={editForm.department ?? ''}
-                onChange={e => setEditForm(f => ({ ...f, department: e.target.value }))} className={inputCls}>
-                <option value="">Select Department</option>
-                {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
-              </select>
+              <SearchableSelect required value={editForm.department ?? ''}
+                onChange={value => setEditForm(f => ({ ...f, department: value }))}
+                placeholder="Select Department" searchPlaceholder="Search departments..."
+                options={DEPARTMENTS.map(department => ({ value: department, label: department }))} />
             </div>
           </div>
           <div>
@@ -504,6 +501,7 @@ export default function Allocation() {
           {returnData && (
             <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
               <p className="text-sm text-slate-600 mb-1"><strong>Item:</strong> {returnData.item_name}</p>
+              <p className="text-sm font-semibold text-slate-700 mb-1"><strong>Inventory record:</strong> Item #{returnData.item_id}</p>
               <p className="text-sm text-slate-600"><strong>Allocated Quantity:</strong> {returnData.quantity}</p>
             </div>
           )}

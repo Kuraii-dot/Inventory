@@ -79,8 +79,44 @@ export async function login(req, res) {
  * The client simply deletes the token from localStorage/memory.
  * This endpoint exists as a clean API endpoint to call on logout.
  */
-export function logout(req, res) {
-  // session_unset() + session_destroy() → client handles token removal
+async function recordSessionActivity(req, action) {
+  const forwardedFor = req.headers?.['x-forwarded-for'];
+  const ip = (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0]?.trim())
+    || req.socket?.remoteAddress || null;
+  await pool.query(
+    `INSERT INTO activity_logs
+       (user_id, username, action, module, record_id, description, new_data, ip_address)
+     VALUES ($1, $2, $3, 'auth', $1, $4, $5, $6)`,
+    [
+      req.user?.id || null,
+      req.user?.username || 'system',
+      action,
+      `${req.user?.username || 'Unknown user'} ${action === 'LOGIN' ? 'logged in' : 'logged out'}`,
+      JSON.stringify({ role: req.user?.role || null }),
+      ip,
+    ]
+  );
+}
+
+// Called once after Supabase Auth succeeds. Keeping it separate from /me avoids
+// creating duplicate LOGIN entries whenever the app restores a saved session.
+export async function loginEvent(req, res) {
+  try {
+    await recordSessionActivity(req, 'LOGIN');
+    return res.json({ message: 'Login recorded.' });
+  } catch (err) {
+    console.error('Login log error:', err.message);
+    return res.status(500).json({ message: 'Could not record login activity.' });
+  }
+}
+
+export async function logout(req, res) {
+  try {
+    await recordSessionActivity(req, 'LOGOUT');
+  } catch (err) {
+    // Signing out must still work if audit storage is temporarily unavailable.
+    console.error('Logout log error:', err.message);
+  }
   return res.json({ message: 'Logged out successfully.' });
 }
 
